@@ -11,6 +11,9 @@ Comandos:
   step [n]
   regs
   quit
+  break <0xADDR>
+  bl
+  run [max_steps]
 """
 
 def repl():
@@ -67,6 +70,26 @@ def repl():
                 r = backend.regs()
                 for k, v in r.items():
                     print(f"{k:>4} = 0x{v:08X}")
+            
+            elif cmd == "break":
+                if len(parts) != 2:
+                    raise ValueError("Uso: break 0xADDR")
+                backend.add_breakpoint(parts[1])
+                print(f"OK: breakpoint en {parts[1]}")
+
+            elif cmd == "bl":
+                bps = sorted(list(backend.breakpoints))
+                if not bps:
+                    print("(sin breakpoints)")
+                else:
+                    for a in bps:
+                        print(f"* 0x{a:08X}")
+
+            elif cmd == "run":
+                max_steps = int(parts[1]) if len(parts) >= 2 else 100000
+                reason = backend.run_until_break(max_steps=max_steps)
+                pc = backend.regs()["PC"]
+                print(f"OK: run terminado ({reason}) PC=0x{pc:08X}")
 
             else:
                 print("Comando desconocido. Escribe 'help'.")

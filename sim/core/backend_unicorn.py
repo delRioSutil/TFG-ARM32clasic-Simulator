@@ -13,6 +13,7 @@ class UnicornBackend:
         self.mu = None
         self.base = None
         self.code_len = None
+        self.breakpoints = set()
 
     def load_bin(self, bin_path: str, base_hex: str = "0x00000000", mem_size: int = 2 * 1024 * 1024):
         p = Path(bin_path)
@@ -62,3 +63,27 @@ class UnicornBackend:
             "PC": mu.reg_read(UC_ARM_REG_PC),
             "CPSR": mu.reg_read(UC_ARM_REG_CPSR),
         }
+    
+    def add_breakpoint(self, addr_hex: str):
+        addr = int(addr_hex, 16)
+        self.breakpoints.add(addr)
+
+    def clear_breakpoints(self):
+        self.breakpoints.clear()
+
+    def run_until_break(self, max_steps: int = 100000):
+        """
+        Ejecuta instrucción a instrucción hasta:
+        - llegar a un breakpoint (PC == addr)
+        - o consumir max_steps
+        Devuelve: "break" o "max"
+        """
+        if self.mu is None:
+            raise RuntimeError("No hay programa cargado. Usa 'load' primero.")
+
+        for _ in range(max_steps):
+            pc = self.mu.reg_read(UC_ARM_REG_PC)
+            if pc in self.breakpoints:
+                return "break"
+            self.step(1)
+        return "max"
