@@ -3,6 +3,9 @@ import shlex
 
 from sim.core.toolchain import build_asm
 from sim.core.backend_unicorn import UnicornBackend
+from pathlib import Path
+from sim.core.symbols import resolve_symbol
+from sim.core.disasm import disasm_elf
 
 HELP = """
 Comandos:
@@ -10,6 +13,7 @@ Comandos:
   load <file.bin> [--base 0x00000000]
   step [n]
   regs
+  disasm
   quit
   break <0xADDR>
   bl
@@ -18,6 +22,8 @@ Comandos:
 
 def repl():
     backend = UnicornBackend()
+    current_elf = None
+    current_bin = None
     print("ARM32 Teaching Simulator (CLI interactive)")
     print("Escribe 'help' para ver comandos.")
 
@@ -48,6 +54,11 @@ def repl():
                 p.add_argument("--base", default="0x00000000")
                 a = p.parse_args(parts[1:])
                 build_asm(a.src, a.base)
+                name = Path(a.src).stem   # "hello" a partir de ".../hello.s"
+                current_elf = f"build/{name}.elf"
+                current_bin = f"build/{name}.bin"
+                print(f"ELF: {current_elf}")
+                print(f"BIN: {current_bin}")
                 print("OK: build terminado")
 
             elif cmd == "load":
@@ -56,6 +67,12 @@ def repl():
                 p.add_argument("--base", default="0x00000000")
                 a = p.parse_args(parts[1:])
                 backend.load_bin(a.bin, a.base)
+                current_bin = a.bin
+                # Si el bin es build/X.bin, probamos build/X.elf
+                if a.bin.endswith(".bin"):
+                    guess = a.bin[:-4] + ".elf"
+                    if Path(guess).exists():
+                        current_elf = guess
                 print(f"OK: cargado {a.bin} en base {a.base}")
 
             elif cmd == "step":
@@ -73,9 +90,17 @@ def repl():
             
             elif cmd == "break":
                 if len(parts) != 2:
-                    raise ValueError("Uso: break 0xADDR")
-                backend.add_breakpoint(parts[1])
-                print(f"OK: breakpoint en {parts[1]}")
+                    raise ValueError("Uso: break 0xADDR | break <symbol>")
+                target = parts[1]
+                if target.startswith("0x") or target.startswith("0X"):
+                    backend.add_breakpoint(target)
+                    print(f"OK: breakpoint en {target}")
+                else:
+                    if current_elf is None:
+                        raise ValueError("No hay ELF asociado. Ejecuta primero 'build ...' o carga un .bin que tenga .elf al lado.")
+                    addr = resolve_symbol(current_elf, target)
+                    backend.add_breakpoint(hex(addr))
+                    print(f"OK: breakpoint en {target} (0x{addr:08X})")
 
             elif cmd == "bl":
                 bps = sorted(list(backend.breakpoints))
@@ -90,6 +115,17 @@ def repl():
                 reason = backend.run_until_break(max_steps=max_steps)
                 pc = backend.regs()["PC"]
                 print(f"OK: run terminado ({reason}) PC=0x{pc:08X}")
+
+            elif cmd == "disasm":
+                if current_elf is None:
+                    raise ValueError("No hay ELF asociado. Ejecuta 'build ...' primero.")
+                txt = disasm_elf(current_elf)
+                # Por ahora mostramos las primeras ~60 líneas para no inundar
+                lines = txt.splitlines()
+                for line in lines[:60]:
+                    print(line)
+                if len(lines) > 60:
+                    print("... (truncado)")
 
             else:
                 print("Comando desconocido. Escribe 'help'.")
