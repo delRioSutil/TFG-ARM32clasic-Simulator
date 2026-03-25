@@ -1,3 +1,5 @@
+import struct
+from unicorn import UcError, UC_ERR_INSN_INVALID, UC_HOOK_CODE
 from pathlib import Path
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_PROT_ALL
 from unicorn.arm_const import (
@@ -14,6 +16,10 @@ class UnicornBackend:
         self.base = None
         self.code_len = None
         self.breakpoints = set()
+        self.vector_base = 0x00000000
+        self._pending_exception = None
+        self.last_exception = None
+        self.spsr_svc = None
 
     def load_bin(self, bin_path: str, base_hex: str = "0x00000000", mem_size: int = 2 * 1024 * 1024):
         p = Path(bin_path)
@@ -29,15 +35,31 @@ class UnicornBackend:
         mu.reg_write(UC_ARM_REG_PC, base)
 
         self.mu = mu
+        # Hook para ver cada instrucción y detectar SWI
+        self.mu.hook_add(UC_HOOK_CODE, self._hook_code)
         self.base = base
         self.code_len = len(code)
 
     def step(self, n: int = 1):
+        self.last_exception = None
+        self._pending_exception = None
         if self.mu is None:
             raise RuntimeError("No hay programa cargado. Usa 'load' primero.")
         pc = self.mu.reg_read(UC_ARM_REG_PC)
         # Ejecuta n instrucciones desde el PC actual
-        self.mu.emu_start(pc, self.base + self.code_len, count=n)
+        try:
+             self.mu.emu_start(pc, self.base + self.code_len, count=n)
+        except UcError as e:
+            # Undefined instruction (mínimo)
+            if e.errno == UC_ERR_INSN_INVALID:
+                self._pending_exception = ("UNDEF", pc, None)
+            else:
+                raise
+
+        # Si hubo excepción detectada por hook o por error, entra en excepción
+        if self._pending_exception:
+            etype, at_pc, extra = self._pending_exception
+            self._enter_exception(etype, at_pc, extra)
 
     def regs(self) -> dict:
         if self.mu is None:
@@ -86,4 +108,50 @@ class UnicornBackend:
             if pc in self.breakpoints:
                 return "break"
             self.step(1)
+            if self.last_exception is not None:
+                return "exception"
         return "max"
+
+    def _hook_code(self, uc, address, size, user_data=None):
+        # Por ahora solo ARM (4 bytes). Thumb lo trataremos más adelante.
+        if size != 4:
+            return
+
+        try:
+            insn = uc.mem_read(address, size)
+        except Exception:
+            return
+
+        opcode = struct.unpack("<I", insn)[0]
+
+        # ARM SWI encoding: 0xEF000000 | imm24
+        if (opcode & 0xFF000000) == 0xEF000000:
+            imm24 = opcode & 0x00FFFFFF
+            self._pending_exception = ("SWI", address, imm24)
+            uc.emu_stop()  # paramos para que el "step/run" devuelva control al usuario
+
+    def _enter_exception(self, etype: str, at_pc: int, imm=None):
+        # Lee CPSR actual
+        cpsr = self.mu.reg_read(UC_ARM_REG_CPSR)
+
+        if etype == "SWI":
+            # Guarda CPSR en SPSR_svc (modelo mínimo)
+            self.spsr_svc = cpsr
+
+            # LR_svc = dirección de retorno (PC + 4 en ARM)
+            self.mu.reg_write(UC_ARM_REG_LR, at_pc + 4)
+
+            # Cambia modo a SVC (0x13) y enmascara IRQ (I=1)
+            new_cpsr = (cpsr & ~0x1F) | 0x13
+            new_cpsr |= (1 << 7)  # I bit
+            self.mu.reg_write(UC_ARM_REG_CPSR, new_cpsr)
+
+            # Salta al vector SWI = base + 0x08
+            vec = self.vector_base + 0x08
+            self.mu.reg_write(UC_ARM_REG_PC, vec)
+
+            self.last_exception = {"type": "SWI", "pc": at_pc, "imm24": imm, "vector": vec}
+            return
+
+        # Placeholder para futuras excepciones
+        self.last_exception = {"type": etype, "pc": at_pc, "vector": None}

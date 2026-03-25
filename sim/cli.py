@@ -14,6 +14,7 @@ Comandos:
   step [n]
   regs
   disasm [n]
+  exc
   quit
   break <0xADDR>
   bl
@@ -126,6 +127,16 @@ def repl():
                 out_lines = disasm_around_pc(current_elf, pc, context=ctx)
                 for l in out_lines:
                     print(l)
+
+            elif cmd == "exc":
+                if backend.last_exception is None:
+                    print("(no exception)")
+                else:
+                    e = backend.last_exception
+                    if e["type"] == "SWI":
+                        print(f'EXC SWI at PC=0x{e["pc"]:08X} imm=0x{e["imm24"]:06X} vector=0x{e["vector"]:08X}')
+                    else:
+                        print(f'EXC {e["type"]} at PC=0x{e["pc"]:08X}')
 
             else:
                 print("Comando desconocido. Escribe 'help'.")
