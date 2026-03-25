@@ -5,7 +5,7 @@ from sim.core.toolchain import build_asm
 from sim.core.backend_unicorn import UnicornBackend
 from pathlib import Path
 from sim.core.symbols import resolve_symbol
-from sim.core.disasm import disasm_elf
+from sim.core.disasm import disasm_around_pc
 
 HELP = """
 Comandos:
@@ -13,7 +13,7 @@ Comandos:
   load <file.bin> [--base 0x00000000]
   step [n]
   regs
-  disasm
+  disasm [n]
   quit
   break <0xADDR>
   bl
@@ -119,13 +119,13 @@ def repl():
             elif cmd == "disasm":
                 if current_elf is None:
                     raise ValueError("No hay ELF asociado. Ejecuta 'build ...' primero.")
-                txt = disasm_elf(current_elf)
-                # Por ahora mostramos las primeras ~60 líneas para no inundar
-                lines = txt.splitlines()
-                for line in lines[:60]:
-                    print(line)
-                if len(lines) > 60:
-                    print("... (truncado)")
+                ctx = 5
+                if len(parts) >= 2:
+                    ctx = int(parts[1])
+                pc = backend.regs()["PC"]
+                out_lines = disasm_around_pc(current_elf, pc, context=ctx)
+                for l in out_lines:
+                    print(l)
 
             else:
                 print("Comando desconocido. Escribe 'help'.")
