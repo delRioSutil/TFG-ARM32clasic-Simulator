@@ -1,7 +1,7 @@
 import argparse
 import shlex
 
-from sim.core.toolchain import build_asm
+from sim.core.toolchain import TOOLCHAIN_ENV, build_asm, toolchain_status
 from pathlib import Path
 from sim.core.symbols import resolve_symbol
 from sim.core.disasm import disasm_around_pc
@@ -18,7 +18,27 @@ Comandos:
   break <0xADDR>
   bl
   run [max_steps]
+  doctor
 """
+
+
+def print_doctor() -> None:
+    print("Toolchain ARM GNU:")
+    ok = True
+    for item in toolchain_status():
+        if item["found"]:
+            print(f'  OK   {item["tool"]}: {item["path"]} ({item["source"]})')
+        else:
+            ok = False
+            print(f'  MISS {item["tool"]}')
+
+    if not ok:
+        print()
+        print("No se encontro la toolchain completa.")
+        print("Para modo autocontenido Windows, coloca los ejecutables en:")
+        print("  runtime/toolchain/bin/")
+        print("O define la variable de entorno:")
+        print(f"  {TOOLCHAIN_ENV}=C:\\ruta\\a\\arm-none-eabi\\bin")
 
 def repl():
     from sim.core.backend_unicorn import UnicornBackend
@@ -62,6 +82,9 @@ def repl():
                 print(f"ELF: {current_elf}")
                 print(f"BIN: {current_bin}")
                 print("OK: build terminado")
+
+            elif cmd == "doctor":
+                print_doctor()
 
             elif cmd == "load":
                 p = argparse.ArgumentParser(prog="load", add_help=False)
@@ -150,6 +173,7 @@ def main():
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("repl", help="Modo interactivo (mantiene estado)")
+    sub.add_parser("doctor", help="Comprueba dependencias externas")
     p_build = sub.add_parser("build", help="Build (one-shot)")
     p_build.add_argument("src")
     p_build.add_argument("--base", default="0x00000000")
@@ -163,6 +187,10 @@ def main():
     if args.cmd == "build":
         build_asm(args.src, args.base)
         print("OK: build terminado")
+        return
+
+    if args.cmd == "doctor":
+        print_doctor()
         return
 
 if __name__ == "__main__":

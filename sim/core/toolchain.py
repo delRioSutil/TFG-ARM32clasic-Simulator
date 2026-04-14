@@ -6,6 +6,14 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BUILD_DIR = PROJECT_ROOT / "build"
+TOOLCHAIN_ENV = "ARM32SIM_TOOLCHAIN_BIN"
+REQUIRED_TOOLCHAIN_TOOLS = [
+    "arm-none-eabi-as",
+    "arm-none-eabi-ld",
+    "arm-none-eabi-objcopy",
+    "arm-none-eabi-objdump",
+    "arm-none-eabi-nm",
+]
 
 LOCAL_TOOLCHAIN_DIRS = [
     PROJECT_ROOT / "runtime" / "toolchain" / "bin",
@@ -20,26 +28,64 @@ def _parse_base(base: str) -> int:
         return int(base, 16)
 
 
-def _tool_path(tool_name: str) -> str:
+def _candidate_toolchain_dirs() -> list[tuple[Path, str]]:
+    dirs = []
+    env_path = os.environ.get(TOOLCHAIN_ENV)
+    if env_path:
+        dirs.append((Path(env_path), f"{TOOLCHAIN_ENV}"))
+
+    for directory in LOCAL_TOOLCHAIN_DIRS:
+        dirs.append((directory, "local"))
+
+    return dirs
+
+
+def _tool_names(tool_name: str) -> list[str]:
     names = [tool_name]
     if os.name == "nt" and not tool_name.endswith(".exe"):
         names.append(f"{tool_name}.exe")
+    return names
 
-    for directory in LOCAL_TOOLCHAIN_DIRS:
-        for name in names:
+
+def _find_tool(tool_name: str) -> tuple[str | None, str | None]:
+    for directory, source in _candidate_toolchain_dirs():
+        for name in _tool_names(tool_name):
             candidate = directory / name
             if candidate.exists():
-                return str(candidate)
+                return str(candidate), source
 
     found = shutil.which(tool_name)
     if found:
-        return found
+        return found, "PATH"
+
+    return None, None
+
+
+def _tool_path(tool_name: str) -> str:
+    path, _source = _find_tool(tool_name)
+    if path:
+        return path
 
     raise FileNotFoundError(
         "No se encontro la herramienta "
         f"{tool_name}. Esperada en runtime/toolchain/bin, "
-        "tools/toolchain/bin o en el PATH."
+        f"tools/toolchain/bin, {TOOLCHAIN_ENV} o en el PATH."
     )
+
+
+def toolchain_status() -> list[dict[str, str | bool | None]]:
+    status = []
+    for tool in REQUIRED_TOOLCHAIN_TOOLS:
+        path, source = _find_tool(tool)
+        status.append(
+            {
+                "tool": tool,
+                "found": path is not None,
+                "path": path,
+                "source": source,
+            }
+        )
+    return status
 
 
 def _run(cmd: list[str]) -> None:
