@@ -2,7 +2,6 @@ import argparse
 import shlex
 
 from sim.core.toolchain import build_asm
-from sim.core.backend_unicorn import UnicornBackend
 from pathlib import Path
 from sim.core.symbols import resolve_symbol
 from sim.core.disasm import disasm_around_pc
@@ -22,6 +21,8 @@ Comandos:
 """
 
 def repl():
+    from sim.core.backend_unicorn import UnicornBackend
+
     backend = UnicornBackend()
     current_elf = None
     current_bin = None
