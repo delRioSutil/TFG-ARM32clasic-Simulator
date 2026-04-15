@@ -5,6 +5,7 @@ build/
 *.map
 __pycache__/
 .venv/
+.idea/
 .sim_state.json
 runtime/toolchain/bin/*
 !runtime/toolchain/bin/.gitkeep
