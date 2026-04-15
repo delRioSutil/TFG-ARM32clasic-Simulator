@@ -1,5 +1,9 @@
 import argparse
+import importlib.metadata
+import importlib.util
+import platform
 import shlex
+import sys
 
 from sim.core.toolchain import TOOLCHAIN_ENV, build_asm, toolchain_status
 from pathlib import Path
@@ -23,6 +27,26 @@ Comandos:
 
 
 def print_doctor() -> None:
+    print("Python:")
+    print(f"  OK   version: {platform.python_version()}")
+    print(f"  OK   executable: {sys.executable}")
+    print()
+
+    print("Dependencias Python:")
+    unicorn_spec = importlib.util.find_spec("unicorn")
+    if unicorn_spec is None:
+        print("  MISS unicorn")
+        print("       Instala dependencias de desarrollo con:")
+        print("       python -m pip install -r requirements.txt")
+    else:
+        try:
+            unicorn_version = importlib.metadata.version("unicorn")
+        except importlib.metadata.PackageNotFoundError:
+            unicorn_version = "version desconocida"
+        origin = unicorn_spec.origin or "ruta desconocida"
+        print(f"  OK   unicorn: {unicorn_version} ({origin})")
+
+    print()
     print("Toolchain ARM GNU:")
     ok = True
     for item in toolchain_status():

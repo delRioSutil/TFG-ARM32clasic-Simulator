@@ -70,9 +70,43 @@ El ZIP final debe incluir:
 
 - todo el codigo necesario;
 - la carpeta `runtime/toolchain/bin` con ejecutables ARM GNU;
-- dependencias Python resueltas o empaquetadas segun la estrategia final;
+- dependencias Python empaquetadas;
 - instrucciones de ejecucion para Windows;
 - ejemplos y ejercicios.
+
+## Python, Unicorn y empaquetado final
+
+Durante el desarrollo, las dependencias Python se declaran en:
+
+```text
+requirements.txt
+```
+
+El entorno de desarrollo puede prepararse con:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+La estrategia elegida para la distribucion final sera PyInstaller, pero se implementara mas adelante, cuando el nucleo del simulador este mas estable. El objetivo final sera entregar un ejecutable Windows junto con la toolchain local:
+
+```text
+TFG-ARM32-Simulator/
+  sim.exe
+  runtime/
+    toolchain/
+      bin/
+        arm-none-eabi-as.exe
+        arm-none-eabi-ld.exe
+        arm-none-eabi-objcopy.exe
+        arm-none-eabi-objdump.exe
+        arm-none-eabi-nm.exe
+  examples/
+  docs/
+  README.md
+```
+
+PyInstaller no se introduce todavia como dependencia del proyecto porque no forma parte del runtime normal del simulador. Se anadira en una fase posterior de empaquetado, probablemente bajo una carpeta `packaging/`.
 
 ## Comprobacion del entorno
 
