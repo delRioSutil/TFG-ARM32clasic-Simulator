@@ -6,9 +6,6 @@ import shlex
 import sys
 
 from sim.core.toolchain import TOOLCHAIN_ENV, build_asm, toolchain_status
-from pathlib import Path
-from sim.core.symbols import resolve_symbol
-from sim.core.disasm import disasm_around_pc
 
 HELP = """
 Comandos:
@@ -65,11 +62,9 @@ def print_doctor() -> None:
         print(f"  {TOOLCHAIN_ENV}=C:\\ruta\\a\\arm-none-eabi\\bin")
 
 def repl():
-    from sim.core.backend_unicorn import UnicornBackend
+    from sim.core.session import DebugSession
 
-    backend = UnicornBackend()
-    current_elf = None
-    current_bin = None
+    session = DebugSession()
     print("ARM32 Teaching Simulator (CLI interactive)")
     print("Escribe 'help' para ver comandos.")
 
@@ -99,12 +94,9 @@ def repl():
                 p.add_argument("src")
                 p.add_argument("--base", default="0x00000000")
                 a = p.parse_args(parts[1:])
-                build_asm(a.src, a.base)
-                name = Path(a.src).stem   # "hello" a partir de ".../hello.s"
-                current_elf = f"build/{name}.elf"
-                current_bin = f"build/{name}.bin"
-                print(f"ELF: {current_elf}")
-                print(f"BIN: {current_bin}")
+                artifacts = session.build(a.src, a.base)
+                print(f'ELF: {artifacts["elf"]}')
+                print(f'BIN: {artifacts["bin"]}')
                 print("OK: build terminado")
 
             elif cmd == "doctor":
@@ -115,25 +107,18 @@ def repl():
                 p.add_argument("bin")
                 p.add_argument("--base", default="0x00000000")
                 a = p.parse_args(parts[1:])
-                backend.load_bin(a.bin, a.base)
-                current_bin = a.bin
-                # Si el bin es build/X.bin, probamos build/X.elf
-                if a.bin.endswith(".bin"):
-                    guess = a.bin[:-4] + ".elf"
-                    if Path(guess).exists():
-                        current_elf = guess
+                session.load(a.bin, a.base)
                 print(f"OK: cargado {a.bin} en base {a.base}")
 
             elif cmd == "step":
                 n = 1
                 if len(parts) >= 2:
                     n = int(parts[1])
-                backend.step(n)
-                pc = backend.regs()["PC"]
+                pc = session.step(n)
                 print(f"OK: step {n} (PC=0x{pc:08X})")
 
             elif cmd == "regs":
-                r = backend.regs()
+                r = session.regs()
                 for k, v in r.items():
                     print(f"{k:>4} = 0x{v:08X}")
             
@@ -141,18 +126,14 @@ def repl():
                 if len(parts) != 2:
                     raise ValueError("Uso: break 0xADDR | break <symbol>")
                 target = parts[1]
-                if target.startswith("0x") or target.startswith("0X"):
-                    backend.add_breakpoint(target)
+                addr, symbol = session.add_breakpoint(target)
+                if symbol is None:
                     print(f"OK: breakpoint en {target}")
                 else:
-                    if current_elf is None:
-                        raise ValueError("No hay ELF asociado. Ejecuta primero 'build ...' o carga un .bin que tenga .elf al lado.")
-                    addr = resolve_symbol(current_elf, target)
-                    backend.add_breakpoint(hex(addr))
-                    print(f"OK: breakpoint en {target} (0x{addr:08X})")
+                    print(f"OK: breakpoint en {symbol} (0x{addr:08X})")
 
             elif cmd == "bl":
-                bps = sorted(list(backend.breakpoints))
+                bps = session.list_breakpoints()
                 if not bps:
                     print("(sin breakpoints)")
                 else:
@@ -161,26 +142,22 @@ def repl():
 
             elif cmd == "run":
                 max_steps = int(parts[1]) if len(parts) >= 2 else 100000
-                reason = backend.run_until_break(max_steps=max_steps)
-                pc = backend.regs()["PC"]
+                reason, pc = session.run(max_steps=max_steps)
                 print(f"OK: run terminado ({reason}) PC=0x{pc:08X}")
 
             elif cmd == "disasm":
-                if current_elf is None:
-                    raise ValueError("No hay ELF asociado. Ejecuta 'build ...' primero.")
                 ctx = 5
                 if len(parts) >= 2:
                     ctx = int(parts[1])
-                pc = backend.regs()["PC"]
-                out_lines = disasm_around_pc(current_elf, pc, context=ctx)
+                out_lines = session.disasm(context=ctx)
                 for l in out_lines:
                     print(l)
 
             elif cmd == "exc":
-                if backend.last_exception is None:
+                e = session.last_exception()
+                if e is None:
                     print("(no exception)")
                 else:
-                    e = backend.last_exception
                     if e["type"] == "SWI":
                         print(f'EXC SWI at PC=0x{e["pc"]:08X} imm=0x{e["imm24"]:06X} vector=0x{e["vector"]:08X}')
                     else:
