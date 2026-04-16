@@ -158,10 +158,10 @@ def repl():
                 if e is None:
                     print("(no exception)")
                 else:
-                    if e["type"] == "SWI":
-                        print(f'EXC SWI at PC=0x{e["pc"]:08X} imm=0x{e["imm24"]:06X} vector=0x{e["vector"]:08X}')
+                    if e.type == "SWI":
+                        print(f"EXC SWI at PC=0x{e.pc:08X} imm=0x{e.imm24:06X} vector=0x{e.vector:08X}")
                     else:
-                        print(f'EXC {e["type"]} at PC=0x{e["pc"]:08X}')
+                        print(f"EXC {e.type} at PC=0x{e.pc:08X}")
 
             else:
                 print("Comando desconocido. Escribe 'help'.")

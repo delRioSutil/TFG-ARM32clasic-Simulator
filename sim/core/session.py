@@ -1,6 +1,5 @@
-from typing import Any
-
 from sim.core.disasm import disasm_around_pc
+from sim.core.exceptions import ExceptionEvent
 from sim.core.program import ProgramArtifact
 from sim.core.symbols import resolve_symbol
 from sim.core.toolchain import BUILD_DIR, build_asm
@@ -66,5 +65,5 @@ class DebugSession:
         pc = self.regs()["PC"]
         return disasm_around_pc(str(self.program.elf_path), pc, context=context)
 
-    def last_exception(self) -> dict[str, Any] | None:
+    def last_exception(self) -> ExceptionEvent | None:
         return self.backend.last_exception

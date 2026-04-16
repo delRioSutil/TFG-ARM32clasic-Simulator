@@ -1,6 +1,7 @@
 import struct
 from unicorn import UcError, UC_ERR_INSN_INVALID, UC_HOOK_CODE
 from pathlib import Path
+from sim.core.exceptions import ExceptionEvent
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_PROT_ALL
 from unicorn.arm_const import (
     UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3,
@@ -150,8 +151,24 @@ class UnicornBackend:
             vec = self.vector_base + 0x08
             self.mu.reg_write(UC_ARM_REG_PC, vec)
 
-            self.last_exception = {"type": "SWI", "pc": at_pc, "imm24": imm, "vector": vec}
+            self.last_exception = ExceptionEvent(
+                type="SWI",
+                pc=at_pc,
+                vector=vec,
+                imm24=imm,
+                cpsr_before=cpsr,
+                cpsr_after=new_cpsr,
+                lr=at_pc + 4,
+                explanation="SWI/SVC transfiere el control al vector 0x08 en modo supervisor.",
+            )
             return
 
         # Placeholder para futuras excepciones
-        self.last_exception = {"type": etype, "pc": at_pc, "vector": None}
+        self.last_exception = ExceptionEvent(
+            type=etype,
+            pc=at_pc,
+            vector=None,
+            cpsr_before=cpsr,
+            cpsr_after=cpsr,
+            explanation="Excepcion detectada por el backend; el tratamiento completo queda pendiente.",
+        )
