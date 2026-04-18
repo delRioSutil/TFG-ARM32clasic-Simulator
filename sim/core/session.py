@@ -1,8 +1,8 @@
-from sim.core.disasm import disasm_around_pc
+from sim.debug.disassembly import disasm_around_pc
 from sim.core.exceptions import ExceptionEvent
 from sim.core.program import ProgramArtifact
-from sim.core.symbols import resolve_symbol
-from sim.core.toolchain import BUILD_DIR, build_asm
+from sim.debug.symbols import resolve_symbol
+from sim.toolchain.gnu import BUILD_DIR, build_asm
 
 
 class DebugSession:
@@ -13,7 +13,7 @@ class DebugSession:
     """
 
     def __init__(self):
-        from sim.core.backend_unicorn import UnicornBackend
+        from sim.backend.unicorn_backend import UnicornBackend
 
         self.backend = UnicornBackend()
         self.program: ProgramArtifact | None = None

@@ -5,7 +5,7 @@ import platform
 import shlex
 import sys
 
-from sim.core.toolchain import TOOLCHAIN_ENV, build_asm, toolchain_status
+from sim.toolchain.gnu import TOOLCHAIN_ENV, build_asm, toolchain_status
 
 HELP = """
 Comandos:
