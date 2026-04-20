@@ -272,11 +272,10 @@ Comportamiento docente esperado:
 7. Saltar al vector de SWI/SVC (`base_vector + 0x08`).
 8. Mostrar al alumno que ocurrio y por que.
 
-Debe documentarse claramente si la implementacion es una simplificacion docente respecto a ARM real.
 
 ### Otras excepciones
 
-Prioridad recomendada:
+Prioridad provisional:
 
 1. SWI/SVC.
 2. Undefined instruction.
@@ -367,7 +366,7 @@ El objetivo no es solo evaluar, sino guiar. Los mensajes deben indicar que regis
 
 ## 9. Riesgos principales
 
-- Autocontenido Windows: incluir o localizar la toolchain ARM de forma reproducible puede aumentar tamano y complejidad.
+- Autocontenido Windows: incluir o localizar la toolchain ARM de forma reproducible puede aumentar tamanyo y complejidad.
 - Dependencias Python: Unicorn debe instalarse o empaquetarse de forma controlada.
 - Excepciones ARM: el modelo real es complejo; conviene documentar simplificaciones docentes.
 - Acoplamiento CLI/backend: debe evitarse para que GUI y ejercicios puedan reutilizar el nucleo.
