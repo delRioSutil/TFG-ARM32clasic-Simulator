@@ -1,7 +1,7 @@
 # ARM32 Teaching Simulator (TFG)
 
 SO objetivo: Windows (distribución autocontenida).
-Entorno de desarrollo: WSL2 Ubuntu (para facilitar toolchain GNU y reproducibilidad).
+Entorno de desarrollo: Windows
 
 Objetivo: simulador docente de ARM 32-bit:
 - Pipeline GNU: .s -> .elf -> .bin
