@@ -108,6 +108,19 @@ programa.s
 
 El comando de build no deberia depender de Bash. Para cumplir el objetivo Windows autocontenido, el build debe implementarse en Python invocando ejecutables de toolchain resueltos desde rutas locales del proyecto.
 
+### Arranque y mapa de memoria EPD6
+
+El backend actual inicializa el entorno siguiendo el esquema usado en la EPD6:
+
+- direccion de carga por defecto: `0x00010000`;
+- copia inicial de la tabla de vectores desde la imagen cargada a `0x00000000` cuando el binario contiene al menos 32 bytes;
+- modo final tras `load`: usuario (`0x10`);
+- pila de usuario: `0x00700000`;
+- pilas preparadas para FIQ, IRQ, SVC, ABT, UND, SYS y USER segun el mapa de la EPD6;
+- pagina MMIO de UART mapeada en `0x101F1000`.
+
+Si existe simbolo `main` en el ELF asociado al binario cargado, `DebugSession.load()` usa esa direccion como punto de entrada. Si no existe, el `PC` inicial queda en la direccion base de carga.
+
 ## 5. Modulos propuestos
 
 ```text
@@ -301,7 +314,7 @@ Ejemplo conceptual de configuracion interna generada por la herramienta para el 
 
 ```text
 exercise: suma_basica.s
-base: 0x00000000
+base: 0x00010000
 max_steps: 100
 expected_registers:
   R2: 0x00000003

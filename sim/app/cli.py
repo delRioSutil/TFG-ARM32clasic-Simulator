@@ -9,8 +9,8 @@ from sim.toolchain.gnu import TOOLCHAIN_ENV, build_asm, toolchain_status
 
 HELP = """
 Comandos:
-  build <file.s> [--base 0x00000000]
-  load <file.bin> [--base 0x00000000]
+  build <file.s> [--base 0x00010000]
+  load <file.bin> [--base 0x00010000]
   step [n]
   regs
   disasm [n]
@@ -92,7 +92,7 @@ def repl():
             if cmd == "build":
                 p = argparse.ArgumentParser(prog="build", add_help=False)
                 p.add_argument("src")
-                p.add_argument("--base", default="0x00000000")
+                p.add_argument("--base", default="0x00010000")
                 a = p.parse_args(parts[1:])
                 artifacts = session.build(a.src, a.base)
                 print(f'ELF: {artifacts["elf"]}')
@@ -105,7 +105,7 @@ def repl():
             elif cmd == "load":
                 p = argparse.ArgumentParser(prog="load", add_help=False)
                 p.add_argument("bin")
-                p.add_argument("--base", default="0x00000000")
+                p.add_argument("--base", default="0x00010000")
                 a = p.parse_args(parts[1:])
                 session.load(a.bin, a.base)
                 print(f"OK: cargado {a.bin} en base {a.base}")
@@ -177,7 +177,7 @@ def main():
     sub.add_parser("doctor", help="Comprueba dependencias externas")
     p_build = sub.add_parser("build", help="Build (one-shot)")
     p_build.add_argument("src")
-    p_build.add_argument("--base", default="0x00000000")
+    p_build.add_argument("--base", default="0x00010000")
 
     args = parser.parse_args()
 

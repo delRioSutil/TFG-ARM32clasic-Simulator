@@ -18,17 +18,20 @@ class DebugSession:
         self.backend = UnicornBackend()
         self.program: ProgramArtifact | None = None
 
-    def build(self, src: str, base: str = "0x00000000") -> dict[str, str]:
+    def build(self, src: str, base: str = "0x00010000") -> dict[str, str]:
         base_int = int(base, 0)
         build_asm(src, base)
 
         self.program = ProgramArtifact.from_source(src, base_int, BUILD_DIR)
         return self.program.as_cli_artifacts()
 
-    def load(self, bin_path: str, base: str = "0x00000000") -> None:
+    def load(self, bin_path: str, base: str = "0x00010000") -> None:
         base_int = int(base, 0)
-        self.backend.load_bin(bin_path, base)
-        self.program = ProgramArtifact.from_binary(bin_path, base_int)
+        program = ProgramArtifact.from_binary(bin_path, base_int)
+        entry_point = self._resolve_entry_point(program)
+
+        self.backend.load_bin(bin_path, base, entry_point=entry_point)
+        self.program = program
 
     def step(self, count: int = 1) -> int:
         self.backend.step(count)
@@ -67,3 +70,12 @@ class DebugSession:
 
     def last_exception(self) -> ExceptionEvent | None:
         return self.backend.last_exception
+
+    def _resolve_entry_point(self, program: ProgramArtifact) -> int | None:
+        if program.elf_path is None:
+            return None
+
+        try:
+            return resolve_symbol(str(program.elf_path), "main")
+        except ValueError:
+            return None

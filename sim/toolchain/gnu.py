@@ -131,7 +131,7 @@ def _write_linker_script(path: Path, base_int: int) -> None:
     )
 
 
-def build_asm(src: str, base: str = "0x00000000") -> None:
+def build_asm(src: str, base: str = "0x00010000") -> None:
     src_path = Path(src)
     if not src_path.exists():
         raise FileNotFoundError(f"No existe: {src}")

@@ -1,12 +1,55 @@
 # ARM32 Teaching Simulator (TFG)
 
-SO objetivo: Windows (distribución autocontenida).
-Entorno de desarrollo: Windows
+Simulador docente de ARM32 clasico orientado a ejecucion y depuracion paso a paso.
 
-Objetivo: simulador docente de ARM 32-bit:
-- Pipeline GNU: .s -> .elf -> .bin
-- Ejecución controlada (step/run), breakpoints, inspección de registros/memoria
-- Excepciones: Reset, Undefined, SWI, Prefetch Abort, Data Abort, IRQ, FIQ
-- UI: CLI de pruebas primero, GUI definitiva después
+SO objetivo: Windows con distribucion final autocontenida.
+Entorno de desarrollo actual: Windows.
 
-Motor de ejecución (por decidir con el tutor): Unicorn vs QEMU.
+## Estado actual
+
+- Arquitectura objetivo: ARM de 32 bits en modo ARM clasico.
+- Backend de ejecucion: Unicorn Engine.
+- Toolchain: GNU ARM (`arm-none-eabi-*`).
+- Pipeline: `.s -> .o -> .elf -> .bin`.
+- CLI interactiva para build, load, step, run, registros, breakpoints, desensamblado y excepciones.
+- Motor inicial de ejercicios con validacion de registros finales.
+
+## Arranque por defecto
+
+El entorno de carga sigue el mapa usado en la EPD6:
+
+- direccion de carga por defecto: `0x00010000`;
+- vectores ARM copiados a `0x00000000` cuando el binario los contiene;
+- modo final tras `load`: usuario;
+- pila de usuario: `0x00700000`;
+- pilas preparadas para FIQ, IRQ, SVC, ABT, UND, SYS y USER;
+- UART MMIO mapeada en `0x101F1000`.
+
+## Comandos principales
+
+```powershell
+python -m sim doctor
+python -m sim build examples/asm/hello.s
+python -m sim repl
+```
+
+Dentro del REPL:
+
+```text
+load build/hello.bin
+step
+regs
+disasm
+break bp_here
+run
+exc
+quit
+```
+
+## Dependencias
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+La distribucion final prevista sera autocontenida para Windows, con PyInstaller y toolchain local en `runtime/toolchain/bin`.

@@ -11,6 +11,36 @@ from unicorn.arm_const import (
     UC_ARM_REG_CPSR
 )
 
+
+EPD6_LOAD_ADDRESS = 0x00010000
+EPD6_VECTOR_BASE = 0x00000000
+EPD6_VECTOR_SIZE = 0x20
+EPD6_RAM_BASE = 0x00000000
+EPD6_RAM_SIZE = 0x00800000
+EPD6_UART_BASE = 0x101F1000
+EPD6_UART_SIZE = 0x1000
+EPD6_UARTDR = 0x101F1000
+EPD6_UARTFR = 0x101F1018
+
+ARM_MODE_USER = 0x10
+ARM_MODE_FIQ = 0x11
+ARM_MODE_IRQ = 0x12
+ARM_MODE_SVC = 0x13
+ARM_MODE_ABT = 0x17
+ARM_MODE_UND = 0x1B
+ARM_MODE_SYS = 0x1F
+
+EPD6_STACKS = [
+    (ARM_MODE_FIQ, 0x00100000),
+    (ARM_MODE_IRQ, 0x00200000),
+    (ARM_MODE_SVC, 0x00300000),
+    (ARM_MODE_ABT, 0x00400000),
+    (ARM_MODE_UND, 0x00500000),
+    (ARM_MODE_SYS, 0x00600000),
+    (ARM_MODE_USER, 0x00700000),
+]
+
+
 class UnicornBackend:
     def __init__(self):
         self.mu = None
@@ -22,24 +52,52 @@ class UnicornBackend:
         self.last_exception = None
         self.spsr_svc = None
 
-    def load_bin(self, bin_path: str, base_hex: str = "0x00000000", mem_size: int = 2 * 1024 * 1024):
+    def load_bin(
+        self,
+        bin_path: str,
+        base_hex: str = "0x00010000",
+        mem_size: int = EPD6_RAM_SIZE,
+        entry_point: int | None = None,
+    ):
         p = Path(bin_path)
         if not p.exists():
             raise FileNotFoundError(f"No existe: {bin_path}")
 
         code = p.read_bytes()
-        base = int(base_hex, 16)
+        base = int(base_hex, 0)
 
         mu = Uc(UC_ARCH_ARM, UC_MODE_ARM)
-        mu.mem_map(base, mem_size, UC_PROT_ALL)
+        mu.mem_map(EPD6_RAM_BASE, mem_size, UC_PROT_ALL)
+        mu.mem_map(EPD6_UART_BASE, EPD6_UART_SIZE, UC_PROT_ALL)
         mu.mem_write(base, code)
-        mu.reg_write(UC_ARM_REG_PC, base)
 
         self.mu = mu
+        self._copy_vectors_to_zero(code, base)
+        self._configure_epd6_stacks()
+        self._enter_user_mode()
+        mu.reg_write(UC_ARM_REG_PC, entry_point if entry_point is not None else base)
         # Hook para ver cada instrucción y detectar SWI
         self.mu.hook_add(UC_HOOK_CODE, self._hook_code)
         self.base = base
         self.code_len = len(code)
+        self.vector_base = EPD6_VECTOR_BASE
+
+    def _copy_vectors_to_zero(self, code: bytes, base: int):
+        if base == EPD6_VECTOR_BASE or len(code) < EPD6_VECTOR_SIZE:
+            return
+        self.mu.mem_write(EPD6_VECTOR_BASE, code[:EPD6_VECTOR_SIZE])
+
+    def _configure_epd6_stacks(self):
+        for mode, sp in EPD6_STACKS:
+            self._set_mode(mode)
+            self.mu.reg_write(UC_ARM_REG_SP, sp)
+
+    def _enter_user_mode(self):
+        self._set_mode(ARM_MODE_USER)
+
+    def _set_mode(self, mode: int):
+        cpsr = self.mu.reg_read(UC_ARM_REG_CPSR)
+        self.mu.reg_write(UC_ARM_REG_CPSR, (cpsr & ~0x1F) | mode)
 
     def step(self, n: int = 1):
         self.last_exception = None

@@ -6,7 +6,7 @@ from pathlib import Path
 class Exercise:
     source_path: Path
     expected_registers: dict[str, int]
-    base: str = "0x00000000"
+    base: str = "0x00010000"
     max_steps: int = 1000
     stop_symbol: str = "end"
 
