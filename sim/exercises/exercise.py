@@ -3,9 +3,18 @@ from pathlib import Path
 
 
 @dataclass(frozen=True)
+class MemoryExpectation:
+    address: int
+    expected: int | bytes | str
+    size: int = 4
+    byteorder: str = "little"
+
+
+@dataclass(frozen=True)
 class Exercise:
     source_path: Path
     expected_registers: dict[str, int]
+    expected_memory: list[MemoryExpectation] = field(default_factory=list)
     base: str = "0x00010000"
     max_steps: int = 1000
     stop_symbol: str = "end"

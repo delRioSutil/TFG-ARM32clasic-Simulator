@@ -1,6 +1,6 @@
 from sim.core.session import DebugSession
 from sim.exercises.exercise import CheckResult, Exercise, ExerciseResult
-from sim.exercises.validators import validate_expected_registers
+from sim.exercises.validators import validate_expected_memory, validate_expected_registers
 
 
 class ExerciseRunner:
@@ -39,6 +39,7 @@ class ExerciseRunner:
             )
 
         checks.extend(validate_expected_registers(session.regs(), exercise.expected_registers))
+        checks.extend(validate_expected_memory(session.memory, exercise.expected_memory))
 
         return ExerciseResult(
             exercise=exercise,

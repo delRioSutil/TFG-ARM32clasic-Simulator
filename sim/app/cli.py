@@ -9,12 +9,13 @@ from sim.toolchain.gnu import TOOLCHAIN_ENV, build_asm, toolchain_status
 
 HELP = """
 Comandos:
-  build <file.s> [--base 0x00010000]
-  load <file.bin> [--base 0x00010000]
+  build <file.s>
+  load <file.bin>
   step [n] | si [n] | stepinto [n]
   next [max_steps] | so [max_steps] | stepover [max_steps]
   finish [max_steps] | stepout [max_steps]
   regs
+  mem <0xADDR> [size]
   disasm [n]
   exc
   quit
@@ -62,6 +63,16 @@ def print_doctor() -> None:
         print("  runtime/toolchain/bin/")
         print("O define la variable de entorno:")
         print(f"  {TOOLCHAIN_ENV}=C:\\ruta\\a\\arm-none-eabi\\bin")
+
+
+def format_memory_dump(address: int, data: bytes, row_size: int = 16) -> list[str]:
+    lines = []
+    for offset in range(0, len(data), row_size):
+        chunk = data[offset : offset + row_size]
+        hex_bytes = " ".join(f"{byte:02X}" for byte in chunk)
+        ascii_text = "".join(chr(byte) if 32 <= byte <= 126 else "." for byte in chunk)
+        lines.append(f"0x{address + offset:08X}: {hex_bytes:<47}  {ascii_text}")
+    return lines
 
 def repl():
     from sim.core.session import DebugSession
@@ -133,6 +144,15 @@ def repl():
                 r = session.regs()
                 for k, v in r.items():
                     print(f"{k:>4} = 0x{v:08X}")
+
+            elif cmd == "mem":
+                if len(parts) not in (2, 3):
+                    raise ValueError("Uso: mem <0xADDR> [size]")
+                address = int(parts[1], 0)
+                size = int(parts[2], 0) if len(parts) == 3 else 64
+                data = session.memory(address, size)
+                for line in format_memory_dump(address, data):
+                    print(line)
             
             elif cmd == "break":
                 if len(parts) != 2:

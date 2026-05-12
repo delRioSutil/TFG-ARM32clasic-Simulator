@@ -54,6 +54,10 @@ class DebugSession:
     def regs(self) -> dict[str, int]:
         return self.backend.regs()
 
+    def memory(self, address: int | str, size: int = 64) -> bytes:
+        addr = int(address, 0) if isinstance(address, str) else address
+        return self.backend.read_memory(addr, size)
+
     def add_breakpoint(self, target: str) -> tuple[int, str | None]:
         if target.startswith(("0x", "0X")):
             self.backend.add_breakpoint(target)

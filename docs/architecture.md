@@ -8,6 +8,7 @@ El proyecto es un simulador/emulador docente de ARM32 orientado a practicas de l
 - registros generales y especiales;
 - PC, SP, LR y CPSR;
 - memoria y pila;
+- inspeccion de memoria;
 - saltos, llamadas y retorno;
 - depuracion paso a paso;
 - depuracion tipo debugger: step into, step over y step out;
@@ -311,7 +312,7 @@ Flujo docente previsto:
 
 1. El profesor selecciona una carpeta con ejercicios.
 2. La herramienta detecta los archivos `.s` de esa carpeta.
-3. El profesor define para cada ejercicio los registros esperados al finalizar la ejecucion, por ejemplo `R0 = 1`, `R1 = 2`, `R2 = 3`.
+3. El profesor define para cada ejercicio los registros esperados al finalizar la ejecucion, por ejemplo `R0 = 1`, `R1 = 2`, `R2 = 3`, y opcionalmente valores esperados en memoria.
 4. La herramienta ensambla y ejecuta cada `.s` en una sesion controlada.
 5. La ejecucion se detiene por condicion de fin definida, simbolo final, breakpoint docente o limite de pasos.
 6. La herramienta compara automaticamente los registros finales reales con los valores esperados.
@@ -325,6 +326,10 @@ base: 0x00010000
 max_steps: 100
 expected_registers:
   R2: 0x00000003
+expected_memory:
+  - address: 0x00010040
+    size: 4
+    expected: 0x00000003
 ```
 
 El motor de ejercicios debe ejecutar el programa en una sesion controlada y producir un resultado claro:
@@ -333,9 +338,10 @@ El motor de ejercicios debe ejecutar el programa en una sesion controlada y prod
 Ejercicio: suma_basica.s
 PASS R2 esperado 0x00000003 obtenido 0x00000003
 FAIL R3 esperado 0x00000000 obtenido 0x00000005
+PASS MEM[0x00010040..0x00010043] esperado 03 00 00 00 obtenido 03 00 00 00
 ```
 
-La primera version de correccion deberia centrarse en registros finales porque es simple, defendible y alineada con practicas introductorias de ensamblador. Mas adelante se pueden anadir comprobaciones de memoria, excepciones esperadas, simbolos alcanzados o flujo ejecutado.
+La primera version de correccion se centra en registros finales y valores de memoria concretos, porque son comprobaciones simples, defendibles y alineadas con practicas introductorias de ensamblador. Mas adelante se pueden anadir comprobaciones de excepciones esperadas, simbolos alcanzados o flujo ejecutado.
 
 El objetivo no es solo evaluar, sino guiar. Los mensajes deben indicar que registro se esperaba, que valor se obtuvo y, cuando sea posible, que instruccion o zona del programa puede estar relacionada.
 

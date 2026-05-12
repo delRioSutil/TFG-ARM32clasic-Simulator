@@ -188,6 +188,18 @@ class UnicornBackend:
             "PC": mu.reg_read(UC_ARM_REG_PC),
             "CPSR": mu.reg_read(UC_ARM_REG_CPSR),
         }
+
+    def read_memory(self, address: int, size: int) -> bytes:
+        self._ensure_loaded()
+        if size <= 0:
+            raise ValueError("El tamaño de memoria debe ser mayor que cero.")
+
+        try:
+            return bytes(self.mu.mem_read(address, size))
+        except UcError as exc:
+            raise RuntimeError(
+                f"No se pudo leer memoria en 0x{address:08X} con tamaño {size}."
+            ) from exc
     
     def add_breakpoint(self, addr_hex: str):
         addr = int(addr_hex, 16)
