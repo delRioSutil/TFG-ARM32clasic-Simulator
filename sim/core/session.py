@@ -29,13 +29,27 @@ class DebugSession:
         base_int = int(base, 0)
         program = ProgramArtifact.from_binary(bin_path, base_int)
         entry_point = self._resolve_entry_point(program)
+        exception_handlers = self._resolve_exception_handlers(program)
 
-        self.backend.load_bin(bin_path, base, entry_point=entry_point)
+        self.backend.load_bin(
+            bin_path,
+            base,
+            entry_point=entry_point,
+            exception_handlers=exception_handlers,
+        )
         self.program = program
 
     def step(self, count: int = 1) -> int:
         self.backend.step(count)
         return self.regs()["PC"]
+
+    def next(self, max_steps: int = 100000) -> tuple[str, int]:
+        reason = self.backend.next(max_steps=max_steps)
+        return reason, self.regs()["PC"]
+
+    def finish(self, max_steps: int = 100000) -> tuple[str, int]:
+        reason = self.backend.finish(max_steps=max_steps)
+        return reason, self.regs()["PC"]
 
     def regs(self) -> dict[str, int]:
         return self.backend.regs()
@@ -79,3 +93,16 @@ class DebugSession:
             return resolve_symbol(str(program.elf_path), "main")
         except ValueError:
             return None
+
+    def _resolve_exception_handlers(self, program: ProgramArtifact) -> dict[str, int]:
+        if program.elf_path is None:
+            return {}
+
+        handlers = {}
+        for symbol in ("swi_handler", "svc_handler"):
+            try:
+                handlers["SWI"] = resolve_symbol(str(program.elf_path), symbol)
+                break
+            except ValueError:
+                pass
+        return handlers

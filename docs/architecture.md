@@ -10,6 +10,7 @@ El proyecto es un simulador/emulador docente de ARM32 orientado a practicas de l
 - memoria y pila;
 - saltos, llamadas y retorno;
 - depuracion paso a paso;
+- depuracion tipo debugger: step into, step over y step out;
 - breakpoints;
 - desensamblado;
 - excepciones relevantes del temario;
@@ -102,6 +103,7 @@ programa.s
      -> registros
      -> memoria
      -> instruccion actual
+     -> step into, step over y step out
      -> excepciones
      -> validacion de ejercicios
 ```
@@ -120,6 +122,8 @@ El backend actual inicializa el entorno siguiendo el esquema usado en la EPD6:
 - pagina MMIO de UART mapeada en `0x101F1000`.
 
 Si existe simbolo `main` en el ELF asociado al binario cargado, `DebugSession.load()` usa esa direccion como punto de entrada. Si no existe, el `PC` inicial queda en la direccion base de carga.
+
+Si existe simbolo `swi_handler` o `svc_handler`, la sesion lo registra como manejador software de excepcion. Esto permite que el backend entre directamente en la rutina docente conocida al producirse `SWI/SVC`, manteniendo a la vez el vector arquitectonico `0x00000008` como dato explicativo del evento.
 
 ## 5. Modulos propuestos
 
@@ -220,6 +224,7 @@ Agrupa utilidades de depuracion:
 
 - contexto de desensamblado alrededor del PC;
 - resolucion de simbolos;
+- operaciones de debugger sobre el backend: `step`, `next` y `finish`;
 - traza de instrucciones ejecutadas;
 - formato docente de instrucciones.
 
@@ -284,6 +289,8 @@ Comportamiento docente esperado:
 6. Establecer direccion de retorno en LR segun el modelo ARM usado.
 7. Saltar al vector de SWI/SVC (`base_vector + 0x08`).
 8. Mostrar al alumno que ocurrio y por que.
+
+En la implementacion actual, si el ELF contiene un simbolo `swi_handler` o `svc_handler`, el backend usa esa direccion como destino de ejecucion de la excepcion. Si no existe, el destino queda en el vector `0x00000008`.
 
 
 ### Otras excepciones

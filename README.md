@@ -11,7 +11,7 @@ Entorno de desarrollo actual: Windows.
 - Backend de ejecucion: Unicorn Engine.
 - Toolchain: GNU ARM (`arm-none-eabi-*`).
 - Pipeline: `.s -> .o -> .elf -> .bin`.
-- CLI interactiva para build, load, step, run, registros, breakpoints, desensamblado y excepciones.
+- CLI interactiva para build, load, step/next/finish, run, registros, breakpoints, desensamblado y excepciones.
 - Motor inicial de ejercicios con validacion de registros finales.
 
 ## Arranque por defecto
@@ -38,6 +38,8 @@ Dentro del REPL:
 ```text
 load build/hello.bin
 step
+next
+finish
 regs
 disasm
 break bp_here

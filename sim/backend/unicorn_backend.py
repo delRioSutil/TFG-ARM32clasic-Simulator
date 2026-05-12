@@ -8,7 +8,7 @@ from unicorn.arm_const import (
     UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R6, UC_ARM_REG_R7,
     UC_ARM_REG_R8, UC_ARM_REG_R9, UC_ARM_REG_R10, UC_ARM_REG_R11,
     UC_ARM_REG_R12, UC_ARM_REG_SP, UC_ARM_REG_LR, UC_ARM_REG_PC,
-    UC_ARM_REG_CPSR
+    UC_ARM_REG_CPSR, UC_ARM_REG_SPSR
 )
 
 
@@ -40,6 +40,14 @@ EPD6_STACKS = [
     (ARM_MODE_USER, 0x00700000),
 ]
 
+ARM_INSTRUCTION_SIZE = 4
+ARM_COND_AL = 0xE
+ARM_COND_NV = 0xF
+ARM_CPSR_N = 1 << 31
+ARM_CPSR_Z = 1 << 30
+ARM_CPSR_C = 1 << 29
+ARM_CPSR_V = 1 << 28
+
 
 class UnicornBackend:
     def __init__(self):
@@ -47,7 +55,9 @@ class UnicornBackend:
         self.base = None
         self.code_len = None
         self.breakpoints = set()
+        self._temporary_breakpoints = set()
         self.vector_base = 0x00000000
+        self.exception_handlers = {}
         self._pending_exception = None
         self.last_exception = None
         self.spsr_svc = None
@@ -58,6 +68,7 @@ class UnicornBackend:
         base_hex: str = "0x00010000",
         mem_size: int = EPD6_RAM_SIZE,
         entry_point: int | None = None,
+        exception_handlers: dict[str, int] | None = None,
     ):
         p = Path(bin_path)
         if not p.exists():
@@ -81,6 +92,7 @@ class UnicornBackend:
         self.base = base
         self.code_len = len(code)
         self.vector_base = EPD6_VECTOR_BASE
+        self.exception_handlers = exception_handlers or {}
 
     def _copy_vectors_to_zero(self, code: bytes, base: int):
         if base == EPD6_VECTOR_BASE or len(code) < EPD6_VECTOR_SIZE:
@@ -120,6 +132,38 @@ class UnicornBackend:
             etype, at_pc, extra = self._pending_exception
             self._enter_exception(etype, at_pc, extra)
 
+    def next(self, max_steps: int = 100000):
+        """Step over calls and software exceptions."""
+        self._ensure_loaded()
+        pc = self.mu.reg_read(UC_ARM_REG_PC)
+        opcode = self._read_instruction(pc)
+        if not self._instruction_will_execute(opcode):
+            self.step(1)
+            return "step"
+
+        is_swi = self._is_software_interrupt(opcode)
+        if not self._is_call_instruction(opcode) and not is_swi:
+            self.step(1)
+            return "step"
+
+        return_pc = pc + ARM_INSTRUCTION_SIZE
+        return self._run_until_temporary_breakpoint(
+            return_pc,
+            max_steps,
+            stop_on_exception=not is_swi,
+        )
+
+    def finish(self, max_steps: int = 100000):
+        """Continue until the address currently stored in LR."""
+        self._ensure_loaded()
+        lr = self.mu.reg_read(UC_ARM_REG_LR)
+        if lr == 0:
+            raise RuntimeError("No hay direccion de retorno valida en LR.")
+        if lr % ARM_INSTRUCTION_SIZE != 0:
+            raise RuntimeError(f"LR no contiene una direccion ARM alineada: 0x{lr:08X}")
+
+        return self._run_until_temporary_breakpoint(lr, max_steps)
+
     def regs(self) -> dict:
         if self.mu is None:
             raise RuntimeError("No hay programa cargado. Usa 'load' primero.")
@@ -152,24 +196,109 @@ class UnicornBackend:
     def clear_breakpoints(self):
         self.breakpoints.clear()
 
-    def run_until_break(self, max_steps: int = 100000):
+    def run_until_break(self, max_steps: int = 100000, stop_on_exception: bool = True):
         """
         Ejecuta instrucción a instrucción hasta:
         - llegar a un breakpoint (PC == addr)
         - o consumir max_steps
         Devuelve: "break" o "max"
         """
-        if self.mu is None:
-            raise RuntimeError("No hay programa cargado. Usa 'load' primero.")
+        self._ensure_loaded()
 
         for _ in range(max_steps):
             pc = self.mu.reg_read(UC_ARM_REG_PC)
-            if pc in self.breakpoints:
+            if pc in self.breakpoints or pc in self._temporary_breakpoints:
                 return "break"
             self.step(1)
-            if self.last_exception is not None:
+            if stop_on_exception and self.last_exception is not None:
                 return "exception"
         return "max"
+
+    def _run_until_temporary_breakpoint(
+        self,
+        addr: int,
+        max_steps: int,
+        stop_on_exception: bool = True,
+    ):
+        self._temporary_breakpoints.add(addr)
+        try:
+            return self.run_until_break(
+                max_steps=max_steps,
+                stop_on_exception=stop_on_exception,
+            )
+        finally:
+            self._temporary_breakpoints.discard(addr)
+
+    def _ensure_loaded(self):
+        if self.mu is None:
+            raise RuntimeError("No hay programa cargado. Usa 'load' primero.")
+
+    def _read_instruction(self, address: int) -> int:
+        raw = self.mu.mem_read(address, ARM_INSTRUCTION_SIZE)
+        return struct.unpack("<I", raw)[0]
+
+    def _is_call_instruction(self, opcode: int) -> bool:
+        # BL/BLX immediate: cond 101x... with link bit set. cond=1111 is BLX.
+        if (opcode & 0x0E000000) == 0x0A000000 and (opcode & (1 << 24)):
+            return True
+
+        # BLX register: xxxx000100101111111111110011xxxx
+        return (opcode & 0x0FFFFFF0) == 0x012FFF30
+
+    def _is_software_interrupt(self, opcode: int) -> bool:
+        # ARM SVC/SWI: cond 1111 imm24
+        return (opcode & 0x0F000000) == 0x0F000000 and self._condition_code(opcode) != ARM_COND_NV
+
+    def _instruction_will_execute(self, opcode: int) -> bool:
+        if self._is_blx_immediate(opcode):
+            return True
+        return self._condition_passed(opcode)
+
+    def _is_blx_immediate(self, opcode: int) -> bool:
+        return self._condition_code(opcode) == ARM_COND_NV and (opcode & 0x0E000000) == 0x0A000000
+
+    def _condition_code(self, opcode: int) -> int:
+        return (opcode >> 28) & 0xF
+
+    def _condition_passed(self, opcode: int) -> bool:
+        cond = self._condition_code(opcode)
+        cpsr = self.mu.reg_read(UC_ARM_REG_CPSR)
+        n = bool(cpsr & ARM_CPSR_N)
+        z = bool(cpsr & ARM_CPSR_Z)
+        c = bool(cpsr & ARM_CPSR_C)
+        v = bool(cpsr & ARM_CPSR_V)
+
+        if cond == 0x0:
+            return z
+        if cond == 0x1:
+            return not z
+        if cond == 0x2:
+            return c
+        if cond == 0x3:
+            return not c
+        if cond == 0x4:
+            return n
+        if cond == 0x5:
+            return not n
+        if cond == 0x6:
+            return v
+        if cond == 0x7:
+            return not v
+        if cond == 0x8:
+            return c and not z
+        if cond == 0x9:
+            return not c or z
+        if cond == 0xA:
+            return n == v
+        if cond == 0xB:
+            return n != v
+        if cond == 0xC:
+            return not z and n == v
+        if cond == 0xD:
+            return z or n != v
+        if cond == ARM_COND_AL:
+            return True
+        return False
 
     def _hook_code(self, uc, address, size, user_data=None):
         # Por ahora solo ARM (4 bytes). Thumb lo trataremos más adelante.
@@ -183,8 +312,8 @@ class UnicornBackend:
 
         opcode = struct.unpack("<I", insn)[0]
 
-        # ARM SWI encoding: 0xEF000000 | imm24
-        if (opcode & 0xFF000000) == 0xEF000000:
+        # ARM SWI/SVC encoding: cond 1111 imm24. Solo dispara si la condicion pasa.
+        if self._is_software_interrupt(opcode) and self._condition_passed(opcode):
             imm24 = opcode & 0x00FFFFFF
             self._pending_exception = ("SWI", address, imm24)
             uc.emu_stop()  # paramos para que el "step/run" devuelva control al usuario
@@ -197,22 +326,25 @@ class UnicornBackend:
             # Guarda CPSR en SPSR_svc (modelo mínimo)
             self.spsr_svc = cpsr
 
-            # LR_svc = dirección de retorno (PC + 4 en ARM)
-            self.mu.reg_write(UC_ARM_REG_LR, at_pc + 4)
-
             # Cambia modo a SVC (0x13) y enmascara IRQ (I=1)
             new_cpsr = (cpsr & ~0x1F) | 0x13
             new_cpsr |= (1 << 7)  # I bit
             self.mu.reg_write(UC_ARM_REG_CPSR, new_cpsr)
+            self.mu.reg_write(UC_ARM_REG_SPSR, cpsr)
 
-            # Salta al vector SWI = base + 0x08
+            # LR_svc = dirección de retorno (PC + 4 en ARM)
+            self.mu.reg_write(UC_ARM_REG_LR, at_pc + 4)
+
+            # Salta al manejador SWI conocido si existe; si no, al vector SWI = base + 0x08.
             vec = self.vector_base + 0x08
-            self.mu.reg_write(UC_ARM_REG_PC, vec)
+            target = self.exception_handlers.get("SWI", vec)
+            self.mu.reg_write(UC_ARM_REG_PC, target)
 
             self.last_exception = ExceptionEvent(
                 type="SWI",
                 pc=at_pc,
                 vector=vec,
+                handler=target,
                 imm24=imm,
                 cpsr_before=cpsr,
                 cpsr_after=new_cpsr,

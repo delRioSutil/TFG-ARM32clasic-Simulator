@@ -11,7 +11,9 @@ HELP = """
 Comandos:
   build <file.s> [--base 0x00010000]
   load <file.bin> [--base 0x00010000]
-  step [n]
+  step [n] | si [n] | stepinto [n]
+  next [max_steps] | so [max_steps] | stepover [max_steps]
+  finish [max_steps] | stepout [max_steps]
   regs
   disasm [n]
   exc
@@ -110,12 +112,22 @@ def repl():
                 session.load(a.bin, a.base)
                 print(f"OK: cargado {a.bin} en base {a.base}")
 
-            elif cmd == "step":
+            elif cmd in ("step", "si", "stepinto"):
                 n = 1
                 if len(parts) >= 2:
                     n = int(parts[1])
                 pc = session.step(n)
                 print(f"OK: step {n} (PC=0x{pc:08X})")
+
+            elif cmd in ("next", "so", "stepover"):
+                max_steps = int(parts[1]) if len(parts) >= 2 else 100000
+                reason, pc = session.next(max_steps=max_steps)
+                print(f"OK: next terminado ({reason}) PC=0x{pc:08X}")
+
+            elif cmd in ("finish", "stepout"):
+                max_steps = int(parts[1]) if len(parts) >= 2 else 100000
+                reason, pc = session.finish(max_steps=max_steps)
+                print(f"OK: finish terminado ({reason}) PC=0x{pc:08X}")
 
             elif cmd == "regs":
                 r = session.regs()
@@ -159,7 +171,10 @@ def repl():
                     print("(no exception)")
                 else:
                     if e.type == "SWI":
-                        print(f"EXC SWI at PC=0x{e.pc:08X} imm=0x{e.imm24:06X} vector=0x{e.vector:08X}")
+                        print(
+                            f"EXC SWI at PC=0x{e.pc:08X} imm=0x{e.imm24:06X} "
+                            f"vector=0x{e.vector:08X} handler=0x{e.handler:08X}"
+                        )
                     else:
                         print(f"EXC {e.type} at PC=0x{e.pc:08X}")
 

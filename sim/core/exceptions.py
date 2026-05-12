@@ -8,6 +8,7 @@ class ExceptionEvent:
     type: str
     pc: int
     vector: int | None = None
+    handler: int | None = None
     imm24: int | None = None
     cpsr_before: int | None = None
     cpsr_after: int | None = None
