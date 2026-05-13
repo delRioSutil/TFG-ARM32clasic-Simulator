@@ -343,6 +343,11 @@ Ejemplo de configuracion:
       "expected_registers": {
         "R2": "0x00000003"
       }
+    },
+    {
+      "file": "expect_dabort.s",
+      "stop_symbol": null,
+      "expected_exception": "DABORT"
     }
   ]
 }
@@ -361,9 +366,10 @@ Ejercicio: suma_basica.s
 PASS R2 esperado 0x00000003 obtenido 0x00000003
 FAIL R3 esperado 0x00000000 obtenido 0x00000005
 PASS MEM[0x00010040..0x00010043] esperado 03 00 00 00 obtenido 03 00 00 00
+PASS excepcion esperada DABORT obtenida DABORT
 ```
 
-La primera version de correccion se centra en registros finales y valores de memoria concretos, porque son comprobaciones simples, defendibles y alineadas con practicas introductorias de ensamblador. Mas adelante se pueden anadir comprobaciones de excepciones esperadas, simbolos alcanzados o flujo ejecutado.
+La version actual de correccion cubre registros finales, valores de memoria concretos y excepciones esperadas. Si no se declara una excepcion esperada, cualquier excepcion que detenga la ejecucion se considera fallo. La GUI se deja como mejora futura: su funcion seria generar esta configuracion de profesor sin editar JSON manualmente.
 
 El objetivo no es solo evaluar, sino guiar. Los mensajes deben indicar que registro se esperaba, que valor se obtuvo y, cuando sea posible, que instruccion o zona del programa puede estar relacionada.
 

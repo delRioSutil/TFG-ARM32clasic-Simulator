@@ -15,9 +15,11 @@ class Exercise:
     source_path: Path
     expected_registers: dict[str, int]
     expected_memory: list[MemoryExpectation] = field(default_factory=list)
+    expected_exception: str | None = None
+    allow_unexpected_exceptions: bool = False
     base: str = "0x00010000"
     max_steps: int = 1000
-    stop_symbol: str = "end"
+    stop_symbol: str | None = "end"
 
 
 @dataclass(frozen=True)

@@ -22,7 +22,7 @@ def load_exercises(folder: str | Path, config_path: str | Path | None = None) ->
             f"Crea un {DEFAULT_CONFIG_NAME} o usa --config."
         )
 
-    raw = json.loads(config.read_text(encoding="utf-8"))
+    raw = json.loads(config.read_text(encoding="utf-8-sig"))
     defaults = raw.get("defaults", {})
     entries = raw.get("exercises")
     if not isinstance(entries, list):
@@ -55,9 +55,16 @@ def _parse_exercise(
         source_path=source_path,
         expected_registers=_parse_registers(entry.get("expected_registers", {})),
         expected_memory=_parse_memory(entry.get("expected_memory", [])),
+        expected_exception=_parse_optional_exception(entry.get("expected_exception")),
+        allow_unexpected_exceptions=bool(
+            entry.get(
+                "allow_unexpected_exceptions",
+                defaults.get("allow_unexpected_exceptions", False),
+            )
+        ),
         base=str(entry.get("base", defaults.get("base", "0x00010000"))),
         max_steps=int(entry.get("max_steps", defaults.get("max_steps", 1000))),
-        stop_symbol=str(entry.get("stop_symbol", defaults.get("stop_symbol", "end"))),
+        stop_symbol=_parse_optional_symbol(entry.get("stop_symbol", defaults.get("stop_symbol", "end"))),
     )
 
 
@@ -87,6 +94,22 @@ def _parse_memory(raw: Any) -> list[MemoryExpectation]:
         )
 
     return expectations
+
+
+def _parse_optional_exception(raw: Any) -> str | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or not raw.strip():
+        raise ValueError("'expected_exception' debe ser texto o null.")
+    return raw.strip().upper()
+
+
+def _parse_optional_symbol(raw: Any) -> str | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or not raw.strip():
+        raise ValueError("'stop_symbol' debe ser texto o null.")
+    return raw.strip()
 
 
 def _parse_expected_memory_value(value: Any) -> int | bytes | str:

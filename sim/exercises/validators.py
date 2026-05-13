@@ -59,6 +59,48 @@ def validate_expected_memory(
     return results
 
 
+def validate_expected_exception(
+    actual_exception,
+    expected_exception: str | None,
+    allow_unexpected_exceptions: bool = False,
+) -> list[CheckResult]:
+    if actual_exception is None:
+        if expected_exception is None:
+            return []
+        return [
+            CheckResult(
+                passed=False,
+                message=f"FAIL se esperaba excepcion {expected_exception.upper()} pero no ocurrio ninguna",
+            )
+        ]
+
+    actual_type = actual_exception.type.upper()
+    if expected_exception is None:
+        if allow_unexpected_exceptions:
+            return [
+                CheckResult(
+                    passed=True,
+                    message=f"PASS excepcion {actual_type} permitida",
+                )
+            ]
+        return [
+            CheckResult(
+                passed=False,
+                message=f"FAIL excepcion inesperada {actual_type}",
+            )
+        ]
+
+    expected_type = expected_exception.upper()
+    passed = actual_type == expected_type
+    status = "PASS" if passed else "FAIL"
+    return [
+        CheckResult(
+            passed=passed,
+            message=f"{status} excepcion esperada {expected_type} obtenida {actual_type}",
+        )
+    ]
+
+
 def _expected_to_bytes(item: MemoryExpectation) -> bytes:
     expected = item.expected
 

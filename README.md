@@ -14,6 +14,7 @@ Entorno de desarrollo actual: Windows.
 - CLI interactiva para build, load, step/next/finish, run, registros, memoria, breakpoints, desensamblado y excepciones.
 - Soporte docente de excepciones ARM: Reset, Undefined Instruction, SWI/SVC, Prefetch Abort, Data Abort, IRQ y FIQ.
 - Motor inicial de ejercicios con validacion de registros y memoria final.
+- Correccion por carpeta con `checks.json`, incluyendo excepciones esperadas.
 
 ## Arranque por defecto
 

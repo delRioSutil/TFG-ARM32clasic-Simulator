@@ -21,6 +21,16 @@
           "expected": "0x12345678"
         }
       ]
+    },
+    {
+      "file": "expect_swi.s",
+      "stop_symbol": null,
+      "expected_exception": "SWI"
+    },
+    {
+      "file": "expect_dabort.s",
+      "stop_symbol": null,
+      "expected_exception": "DABORT"
     }
   ]
 }
