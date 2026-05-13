@@ -61,4 +61,10 @@ quit
 python -m pip install -r requirements.txt
 ```
 
+## Tests
+
+```powershell
+python -m pytest
+```
+
 La distribucion final prevista sera autocontenida para Windows, con PyInstaller y toolchain local en `runtime/toolchain/bin`.

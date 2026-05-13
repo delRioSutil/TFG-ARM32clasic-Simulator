@@ -439,3 +439,19 @@ Cada cambio debe poder justificarse con una de estas razones:
 - prepara el empaquetado autocontenido en Windows.
 
 Si un cambio no ayuda a ninguno de esos puntos, no deberia entrar en el nucleo del TFG.
+
+## 11. Tests automatizados
+
+El proyecto incluye una suite de regresion con `pytest` centrada en el flujo principal y en los puntos mas fragiles del simulador:
+
+- inicializacion EPD6 al cargar programas;
+- depuracion con `step`, `next` y `finish`;
+- lectura y validacion de memoria;
+- excepciones ARM del temario;
+- correccion automatica de ejercicios por carpeta.
+
+El objetivo no es cubrir todo de forma exhaustiva, sino proteger las funcionalidades docentes principales frente a regresiones. La suite se ejecuta con:
+
+```powershell
+python -m pytest
+```

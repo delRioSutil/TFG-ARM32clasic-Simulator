@@ -1,2 +1,5 @@
 # Runtime dependency for the ARM32 execution backend.
 unicorn==2.1.4
+
+# Test dependency for the automated regression suite.
+pytest>=8
