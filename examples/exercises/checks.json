@@ -1,0 +1,26 @@
+{
+  "defaults": {
+    "base": "0x00010000",
+    "max_steps": 100,
+    "stop_symbol": "end"
+  },
+  "exercises": [
+    {
+      "file": "suma.s",
+      "expected_registers": {
+        "R2": "0x00000003"
+      }
+    },
+    {
+      "file": "mem_store.s",
+      "expected_registers": {},
+      "expected_memory": [
+        {
+          "address": "0x00010010",
+          "size": 4,
+          "expected": "0x12345678"
+        }
+      ]
+    }
+  ]
+}

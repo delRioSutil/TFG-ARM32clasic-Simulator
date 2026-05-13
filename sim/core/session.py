@@ -18,9 +18,9 @@ class DebugSession:
         self.backend = UnicornBackend()
         self.program: ProgramArtifact | None = None
 
-    def build(self, src: str, base: str = "0x00010000") -> dict[str, str]:
+    def build(self, src: str, base: str = "0x00010000", verbose: bool = True) -> dict[str, str]:
         base_int = int(base, 0)
-        build_asm(src, base)
+        build_asm(src, base, verbose=verbose)
 
         self.program = ProgramArtifact.from_source(src, base_int, BUILD_DIR)
         return self.program.as_cli_artifacts()

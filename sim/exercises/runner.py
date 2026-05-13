@@ -6,7 +6,7 @@ from sim.exercises.validators import validate_expected_memory, validate_expected
 class ExerciseRunner:
     def run(self, exercise: Exercise) -> ExerciseResult:
         session = DebugSession()
-        artifacts = session.build(str(exercise.source_path), exercise.base)
+        artifacts = session.build(str(exercise.source_path), exercise.base, verbose=False)
         session.load(artifacts["bin"], exercise.base)
 
         stop_symbol_found = self._try_add_stop_breakpoint(session, exercise.stop_symbol)

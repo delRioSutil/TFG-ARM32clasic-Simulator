@@ -31,6 +31,7 @@ El entorno de carga sigue el mapa usado en la EPD6:
 ```powershell
 python -m sim doctor
 python -m sim build examples/asm/hello.s
+python -m sim check examples/exercises
 python -m sim repl
 ```
 

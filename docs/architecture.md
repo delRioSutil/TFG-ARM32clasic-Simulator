@@ -233,6 +233,8 @@ Agrupa utilidades de depuracion:
 
 Define ejercicios y validadores. En el flujo docente previsto, los alumnos trabajan con archivos `.s`; no deben tener que escribir ficheros de configuracion complejos. El profesor debe poder seleccionar una carpeta con ejercicios y definir desde la herramienta los valores esperados al final de cada ejercicio.
 
+En el estado actual, `loader.py` lee la configuracion `checks.json`, `ExerciseRunner` ensambla y ejecuta cada ejercicio, y `validators.py` compara registros y memoria final.
+
 Un ejercicio debe poder indicar:
 
 - archivo `.s` del alumno o plantilla de codigo;
@@ -324,18 +326,32 @@ Flujo docente previsto:
 6. La herramienta compara automaticamente los registros finales reales con los valores esperados.
 7. La herramienta muestra un informe claro de resultados.
 
-Ejemplo conceptual de configuracion interna generada por la herramienta para el profesor:
+La implementacion actual usa un archivo `checks.json` por carpeta como configuracion del profesor. Los alumnos siguen entregando archivos `.s`; el JSON no forma parte del codigo del alumno y en la GUI futura deberia generarse mediante formularios.
 
-```text
-exercise: suma_basica.s
-base: 0x00010000
-max_steps: 100
-expected_registers:
-  R2: 0x00000003
-expected_memory:
-  - address: 0x00010040
-    size: 4
-    expected: 0x00000003
+Ejemplo de configuracion:
+
+```json
+{
+  "defaults": {
+    "base": "0x00010000",
+    "max_steps": 100,
+    "stop_symbol": "end"
+  },
+  "exercises": [
+    {
+      "file": "suma.s",
+      "expected_registers": {
+        "R2": "0x00000003"
+      }
+    }
+  ]
+}
+```
+
+Comando de correccion:
+
+```powershell
+python -m sim check examples/exercises
 ```
 
 El motor de ejercicios debe ejecutar el programa en una sesion controlada y producir un resultado claro:

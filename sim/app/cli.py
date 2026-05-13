@@ -77,6 +77,25 @@ def format_memory_dump(address: int, data: bytes, row_size: int = 16) -> list[st
         lines.append(f"0x{address + offset:08X}: {hex_bytes:<47}  {ascii_text}")
     return lines
 
+
+def run_check(folder: str, config: str | None = None) -> int:
+    from sim.exercises.loader import load_exercises
+    from sim.exercises.runner import ExerciseRunner
+
+    exercises = load_exercises(folder, config)
+    runner = ExerciseRunner()
+    all_passed = True
+
+    for exercise in exercises:
+        result = runner.run(exercise)
+        all_passed = all_passed and result.passed
+        status = "PASS" if result.passed else "FAIL"
+        print(f"{status} {exercise.source_path.name} ({result.run_reason}) PC=0x{result.final_pc:08X}")
+        for check in result.checks:
+            print(f"  {check.message}")
+
+    return 0 if all_passed else 1
+
 def repl():
     from sim.core.session import DebugSession
 
@@ -234,6 +253,9 @@ def main():
     p_build = sub.add_parser("build", help="Build (one-shot)")
     p_build.add_argument("src")
     p_build.add_argument("--base", default="0x00010000")
+    p_check = sub.add_parser("check", help="Corrige ejercicios desde una carpeta")
+    p_check.add_argument("folder")
+    p_check.add_argument("--config")
 
     args = parser.parse_args()
 
@@ -249,6 +271,9 @@ def main():
     if args.cmd == "doctor":
         print_doctor()
         return
+
+    if args.cmd == "check":
+        raise SystemExit(run_check(args.folder, args.config))
 
 if __name__ == "__main__":
     main()

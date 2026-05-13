@@ -88,7 +88,7 @@ def toolchain_status() -> list[dict[str, str | bool | None]]:
     return status
 
 
-def _run(cmd: list[str]) -> None:
+def _run(cmd: list[str], verbose: bool = True) -> None:
     try:
         result = subprocess.run(
             cmd,
@@ -103,9 +103,9 @@ def _run(cmd: list[str]) -> None:
             raise RuntimeError(details) from exc
         raise RuntimeError(f"Fallo el comando: {' '.join(cmd)}") from exc
 
-    if result.stdout:
+    if verbose and result.stdout:
         print(result.stdout, end="")
-    if result.stderr:
+    if verbose and result.stderr:
         print(result.stderr, end="")
 
 
@@ -131,7 +131,7 @@ def _write_linker_script(path: Path, base_int: int) -> None:
     )
 
 
-def build_asm(src: str, base: str = "0x00010000") -> None:
+def build_asm(src: str, base: str = "0x00010000", verbose: bool = True) -> None:
     src_path = Path(src)
     if not src_path.exists():
         raise FileNotFoundError(f"No existe: {src}")
@@ -152,15 +152,19 @@ def build_asm(src: str, base: str = "0x00010000") -> None:
 
     _write_linker_script(linker_path, base_int)
 
-    print(f"[1/3] Assembling: {src_path} -> {obj_path}")
-    _run([assembler, "-o", str(obj_path), str(src_path)])
+    if verbose:
+        print(f"[1/3] Assembling: {src_path} -> {obj_path}")
+    _run([assembler, "-o", str(obj_path), str(src_path)], verbose=verbose)
 
-    print(f"[2/3] Linking: {obj_path} -> {elf_path} (BASE=0x{base_int:08X})")
-    _run([linker, "-T", str(linker_path), "-o", str(elf_path), str(obj_path)])
+    if verbose:
+        print(f"[2/3] Linking: {obj_path} -> {elf_path} (BASE=0x{base_int:08X})")
+    _run([linker, "-T", str(linker_path), "-o", str(elf_path), str(obj_path)], verbose=verbose)
 
-    print(f"[3/3] Objcopy: {elf_path} -> {bin_path}")
-    _run([objcopy, "-O", "binary", str(elf_path), str(bin_path)])
+    if verbose:
+        print(f"[3/3] Objcopy: {elf_path} -> {bin_path}")
+    _run([objcopy, "-O", "binary", str(elf_path), str(bin_path)], verbose=verbose)
 
-    print("OK")
-    print(f"  ELF: {elf_path}")
-    print(f"  BIN: {bin_path}")
+    if verbose:
+        print("OK")
+        print(f"  ELF: {elf_path}")
+        print(f"  BIN: {bin_path}")
