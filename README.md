@@ -12,6 +12,7 @@ Entorno de desarrollo actual: Windows.
 - Toolchain: GNU ARM (`arm-none-eabi-*`).
 - Pipeline: `.s -> .o -> .elf -> .bin`.
 - CLI interactiva para build, load, step/next/finish, run, registros, memoria, breakpoints, desensamblado y excepciones.
+- Soporte docente de excepciones ARM: Reset, Undefined Instruction, SWI/SVC, Prefetch Abort, Data Abort, IRQ y FIQ.
 - Motor inicial de ejercicios con validacion de registros y memoria final.
 
 ## Arranque por defecto
@@ -46,6 +47,9 @@ disasm
 break bp_here
 run
 exc
+reset
+irq
+fiq
 quit
 ```
 

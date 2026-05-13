@@ -51,6 +51,18 @@ class DebugSession:
         reason = self.backend.finish(max_steps=max_steps)
         return reason, self.regs()["PC"]
 
+    def reset(self) -> int:
+        self.backend.reset()
+        return self.regs()["PC"]
+
+    def irq(self) -> int:
+        self.backend.interrupt("IRQ")
+        return self.regs()["PC"]
+
+    def fiq(self) -> int:
+        self.backend.interrupt("FIQ")
+        return self.regs()["PC"]
+
     def regs(self) -> dict[str, int]:
         return self.backend.regs()
 
@@ -102,11 +114,22 @@ class DebugSession:
         if program.elf_path is None:
             return {}
 
+        handler_symbols = {
+            "RESET": ("reset_handler", "_start"),
+            "UNDEF": ("undef_handler", "undefined_handler"),
+            "SWI": ("swi_handler", "svc_handler"),
+            "PABORT": ("pabort_handler", "prefetch_abort_handler"),
+            "DABORT": ("dabort_handler", "data_abort_handler"),
+            "IRQ": ("irq_handler",),
+            "FIQ": ("fiq_handler",),
+        }
+
         handlers = {}
-        for symbol in ("swi_handler", "svc_handler"):
-            try:
-                handlers["SWI"] = resolve_symbol(str(program.elf_path), symbol)
-                break
-            except ValueError:
-                pass
+        for etype, symbols in handler_symbols.items():
+            for symbol in symbols:
+                try:
+                    handlers[etype] = resolve_symbol(str(program.elf_path), symbol)
+                    break
+                except ValueError:
+                    pass
         return handlers

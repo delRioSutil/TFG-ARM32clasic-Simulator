@@ -18,6 +18,9 @@ Comandos:
   mem <0xADDR> [size]
   disasm [n]
   exc
+  reset
+  irq
+  fiq
   quit
   break <0xADDR>
   bl
@@ -177,6 +180,18 @@ def repl():
                 reason, pc = session.run(max_steps=max_steps)
                 print(f"OK: run terminado ({reason}) PC=0x{pc:08X}")
 
+            elif cmd == "reset":
+                pc = session.reset()
+                print(f"OK: reset simulado PC=0x{pc:08X}")
+
+            elif cmd == "irq":
+                pc = session.irq()
+                print(f"OK: IRQ simulada PC=0x{pc:08X}")
+
+            elif cmd == "fiq":
+                pc = session.fiq()
+                print(f"OK: FIQ simulada PC=0x{pc:08X}")
+
             elif cmd == "disasm":
                 ctx = 5
                 if len(parts) >= 2:
@@ -190,13 +205,19 @@ def repl():
                 if e is None:
                     print("(no exception)")
                 else:
-                    if e.type == "SWI":
-                        print(
-                            f"EXC SWI at PC=0x{e.pc:08X} imm=0x{e.imm24:06X} "
-                            f"vector=0x{e.vector:08X} handler=0x{e.handler:08X}"
-                        )
-                    else:
-                        print(f"EXC {e.type} at PC=0x{e.pc:08X}")
+                    line = (
+                        f"EXC {e.type} at PC=0x{e.pc:08X} "
+                        f"vector=0x{e.vector:08X} handler=0x{e.handler:08X}"
+                    )
+                    if e.lr is not None:
+                        line += f" LR=0x{e.lr:08X}"
+                    if e.imm24 is not None:
+                        line += f" imm=0x{e.imm24:06X}"
+                    if e.fault_address is not None:
+                        line += f" fault=0x{e.fault_address:08X}"
+                    if e.fault_access is not None:
+                        line += f" access={e.fault_access}"
+                    print(line)
 
             else:
                 print("Comando desconocido. Escribe 'help'.")

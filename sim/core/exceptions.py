@@ -13,4 +13,6 @@ class ExceptionEvent:
     cpsr_before: int | None = None
     cpsr_after: int | None = None
     lr: int | None = None
+    fault_address: int | None = None
+    fault_access: str | None = None
     explanation: str = ""

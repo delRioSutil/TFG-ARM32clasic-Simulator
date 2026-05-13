@@ -1,5 +1,22 @@
-import struct
-from unicorn import UcError, UC_ERR_INSN_INVALID, UC_HOOK_CODE
+﻿import struct
+from unicorn import (
+    UcError,
+    UC_ERR_FETCH_PROT,
+    UC_ERR_FETCH_UNMAPPED,
+    UC_ERR_INSN_INVALID,
+    UC_ERR_READ_PROT,
+    UC_ERR_READ_UNMAPPED,
+    UC_ERR_WRITE_PROT,
+    UC_ERR_WRITE_UNMAPPED,
+    UC_HOOK_CODE,
+    UC_HOOK_MEM_INVALID,
+    UC_MEM_FETCH_PROT,
+    UC_MEM_FETCH_UNMAPPED,
+    UC_MEM_READ_PROT,
+    UC_MEM_READ_UNMAPPED,
+    UC_MEM_WRITE_PROT,
+    UC_MEM_WRITE_UNMAPPED,
+)
 from pathlib import Path
 from sim.core.exceptions import ExceptionEvent
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_PROT_ALL
@@ -47,6 +64,82 @@ ARM_CPSR_N = 1 << 31
 ARM_CPSR_Z = 1 << 30
 ARM_CPSR_C = 1 << 29
 ARM_CPSR_V = 1 << 28
+ARM_CPSR_FIQ_DISABLE = 1 << 6
+ARM_CPSR_IRQ_DISABLE = 1 << 7
+
+EXCEPTION_SPECS = {
+    "RESET": {
+        "vector": 0x00,
+        "mode": ARM_MODE_SVC,
+        "lr_offset": None,
+        "mask": ARM_CPSR_IRQ_DISABLE | ARM_CPSR_FIQ_DISABLE,
+        "handlers": ("reset_handler", "_start"),
+        "explanation": "Reset transfiere el control al vector 0x00 en modo supervisor.",
+    },
+    "UNDEF": {
+        "vector": 0x04,
+        "mode": ARM_MODE_UND,
+        "lr_offset": 4,
+        "mask": ARM_CPSR_IRQ_DISABLE,
+        "handlers": ("undef_handler", "undefined_handler"),
+        "explanation": "Undefined Instruction transfiere el control al vector 0x04 en modo indefinido.",
+    },
+    "SWI": {
+        "vector": 0x08,
+        "mode": ARM_MODE_SVC,
+        "lr_offset": 4,
+        "mask": ARM_CPSR_IRQ_DISABLE,
+        "handlers": ("swi_handler", "svc_handler"),
+        "explanation": "SWI/SVC transfiere el control al vector 0x08 en modo supervisor.",
+    },
+    "PABORT": {
+        "vector": 0x0C,
+        "mode": ARM_MODE_ABT,
+        "lr_offset": 4,
+        "mask": ARM_CPSR_IRQ_DISABLE,
+        "handlers": ("pabort_handler", "prefetch_abort_handler"),
+        "explanation": "Prefetch Abort transfiere el control al vector 0x0C en modo abort.",
+    },
+    "DABORT": {
+        "vector": 0x10,
+        "mode": ARM_MODE_ABT,
+        "lr_offset": 8,
+        "mask": ARM_CPSR_IRQ_DISABLE,
+        "handlers": ("dabort_handler", "data_abort_handler"),
+        "explanation": "Data Abort transfiere el control al vector 0x10 en modo abort.",
+    },
+    "IRQ": {
+        "vector": 0x18,
+        "mode": ARM_MODE_IRQ,
+        "lr_offset": 4,
+        "mask": ARM_CPSR_IRQ_DISABLE,
+        "handlers": ("irq_handler",),
+        "explanation": "IRQ transfiere el control al vector 0x18 en modo interrupcion.",
+    },
+    "FIQ": {
+        "vector": 0x1C,
+        "mode": ARM_MODE_FIQ,
+        "lr_offset": 4,
+        "mask": ARM_CPSR_IRQ_DISABLE | ARM_CPSR_FIQ_DISABLE,
+        "handlers": ("fiq_handler",),
+        "explanation": "FIQ transfiere el control al vector 0x1C en modo interrupcion rapida.",
+    },
+}
+
+FETCH_ABORT_ERRORS = {UC_ERR_FETCH_UNMAPPED, UC_ERR_FETCH_PROT}
+DATA_ABORT_ERRORS = {
+    UC_ERR_READ_UNMAPPED,
+    UC_ERR_READ_PROT,
+    UC_ERR_WRITE_UNMAPPED,
+    UC_ERR_WRITE_PROT,
+}
+FETCH_ABORT_ACCESSES = {UC_MEM_FETCH_UNMAPPED, UC_MEM_FETCH_PROT}
+DATA_ABORT_ACCESSES = {
+    UC_MEM_READ_UNMAPPED,
+    UC_MEM_READ_PROT,
+    UC_MEM_WRITE_UNMAPPED,
+    UC_MEM_WRITE_PROT,
+}
 
 
 class UnicornBackend:
@@ -59,6 +152,8 @@ class UnicornBackend:
         self.vector_base = 0x00000000
         self.exception_handlers = {}
         self._pending_exception = None
+        self._pending_fault_address = None
+        self._pending_fault_access = None
         self.last_exception = None
         self.spsr_svc = None
 
@@ -87,8 +182,9 @@ class UnicornBackend:
         self._configure_epd6_stacks()
         self._enter_user_mode()
         mu.reg_write(UC_ARM_REG_PC, entry_point if entry_point is not None else base)
-        # Hook para ver cada instrucción y detectar SWI
+        # Hook para ver cada instrucciÃ³n y detectar SWI
         self.mu.hook_add(UC_HOOK_CODE, self._hook_code)
+        self.mu.hook_add(UC_HOOK_MEM_INVALID, self._hook_mem_invalid)
         self.base = base
         self.code_len = len(code)
         self.vector_base = EPD6_VECTOR_BASE
@@ -114,6 +210,8 @@ class UnicornBackend:
     def step(self, n: int = 1):
         self.last_exception = None
         self._pending_exception = None
+        self._pending_fault_address = None
+        self._pending_fault_access = None
         if self.mu is None:
             raise RuntimeError("No hay programa cargado. Usa 'load' primero.")
         pc = self.mu.reg_read(UC_ARM_REG_PC)
@@ -121,16 +219,38 @@ class UnicornBackend:
         try:
              self.mu.emu_start(pc, self.base + self.code_len, count=n)
         except UcError as e:
-            # Undefined instruction (mínimo)
             if e.errno == UC_ERR_INSN_INVALID:
                 self._pending_exception = ("UNDEF", pc, None)
+            elif e.errno in FETCH_ABORT_ERRORS:
+                self._pending_exception = ("PABORT", pc, None)
+            elif e.errno in DATA_ABORT_ERRORS:
+                self._pending_exception = ("DABORT", pc, None)
             else:
                 raise
 
-        # Si hubo excepción detectada por hook o por error, entra en excepción
+        # Si hubo excepciÃ³n detectada por hook o por error, entra en excepciÃ³n
         if self._pending_exception:
             etype, at_pc, extra = self._pending_exception
-            self._enter_exception(etype, at_pc, extra)
+            self._enter_exception(
+                etype,
+                at_pc,
+                extra,
+                fault_address=self._pending_fault_address,
+                fault_access=self._pending_fault_access,
+            )
+
+    def reset(self):
+        self._ensure_loaded()
+        pc = self.mu.reg_read(UC_ARM_REG_PC)
+        self._enter_exception("RESET", pc)
+
+    def interrupt(self, etype: str):
+        self._ensure_loaded()
+        normalized = etype.upper()
+        if normalized not in ("IRQ", "FIQ"):
+            raise ValueError("Solo se pueden simular interrupciones IRQ o FIQ.")
+        pc = self.mu.reg_read(UC_ARM_REG_PC)
+        self._enter_exception(normalized, pc)
 
     def next(self, max_steps: int = 100000):
         """Step over calls and software exceptions."""
@@ -192,13 +312,13 @@ class UnicornBackend:
     def read_memory(self, address: int, size: int) -> bytes:
         self._ensure_loaded()
         if size <= 0:
-            raise ValueError("El tamaño de memoria debe ser mayor que cero.")
+            raise ValueError("El tamaÃ±o de memoria debe ser mayor que cero.")
 
         try:
             return bytes(self.mu.mem_read(address, size))
         except UcError as exc:
             raise RuntimeError(
-                f"No se pudo leer memoria en 0x{address:08X} con tamaño {size}."
+                f"No se pudo leer memoria en 0x{address:08X} con tamaÃ±o {size}."
             ) from exc
     
     def add_breakpoint(self, addr_hex: str):
@@ -210,7 +330,7 @@ class UnicornBackend:
 
     def run_until_break(self, max_steps: int = 100000, stop_on_exception: bool = True):
         """
-        Ejecuta instrucción a instrucción hasta:
+        Ejecuta instrucciÃ³n a instrucciÃ³n hasta:
         - llegar a un breakpoint (PC == addr)
         - o consumir max_steps
         Devuelve: "break" o "max"
@@ -313,7 +433,7 @@ class UnicornBackend:
         return False
 
     def _hook_code(self, uc, address, size, user_data=None):
-        # Por ahora solo ARM (4 bytes). Thumb lo trataremos más adelante.
+        # Por ahora solo ARM (4 bytes). Thumb lo trataremos mÃ¡s adelante.
         if size != 4:
             return
 
@@ -330,47 +450,71 @@ class UnicornBackend:
             self._pending_exception = ("SWI", address, imm24)
             uc.emu_stop()  # paramos para que el "step/run" devuelva control al usuario
 
-    def _enter_exception(self, etype: str, at_pc: int, imm=None):
+    def _hook_mem_invalid(self, uc, access, address, size, value, user_data=None):
+        pc = uc.reg_read(UC_ARM_REG_PC)
+        self._pending_fault_address = address
+        self._pending_fault_access = access
+
+        if access in FETCH_ABORT_ACCESSES:
+            self._pending_exception = ("PABORT", pc, None)
+        elif access in DATA_ABORT_ACCESSES:
+            self._pending_exception = ("DABORT", pc, None)
+        else:
+            self._pending_exception = ("DABORT", pc, None)
+
+        return False
+
+    def _enter_exception(
+        self,
+        etype: str,
+        at_pc: int,
+        imm=None,
+        fault_address: int | None = None,
+        fault_access: int | None = None,
+    ):
         # Lee CPSR actual
         cpsr = self.mu.reg_read(UC_ARM_REG_CPSR)
+        spec = EXCEPTION_SPECS.get(etype)
+        if spec is None:
+            raise ValueError(f"Excepcion no soportada: {etype}")
 
-        if etype == "SWI":
-            # Guarda CPSR en SPSR_svc (modelo mínimo)
-            self.spsr_svc = cpsr
+        self.spsr_svc = cpsr
+        new_cpsr = (cpsr & ~0x1F) | spec["mode"]
+        new_cpsr |= spec["mask"]
+        self.mu.reg_write(UC_ARM_REG_CPSR, new_cpsr)
+        self.mu.reg_write(UC_ARM_REG_SPSR, cpsr)
 
-            # Cambia modo a SVC (0x13) y enmascara IRQ (I=1)
-            new_cpsr = (cpsr & ~0x1F) | 0x13
-            new_cpsr |= (1 << 7)  # I bit
-            self.mu.reg_write(UC_ARM_REG_CPSR, new_cpsr)
-            self.mu.reg_write(UC_ARM_REG_SPSR, cpsr)
+        lr = None
+        if spec["lr_offset"] is not None:
+            lr = at_pc + spec["lr_offset"]
+            self.mu.reg_write(UC_ARM_REG_LR, lr)
 
-            # LR_svc = dirección de retorno (PC + 4 en ARM)
-            self.mu.reg_write(UC_ARM_REG_LR, at_pc + 4)
+        vector = self.vector_base + spec["vector"]
+        target = self.exception_handlers.get(etype, vector)
+        self.mu.reg_write(UC_ARM_REG_PC, target)
 
-            # Salta al manejador SWI conocido si existe; si no, al vector SWI = base + 0x08.
-            vec = self.vector_base + 0x08
-            target = self.exception_handlers.get("SWI", vec)
-            self.mu.reg_write(UC_ARM_REG_PC, target)
-
-            self.last_exception = ExceptionEvent(
-                type="SWI",
-                pc=at_pc,
-                vector=vec,
-                handler=target,
-                imm24=imm,
-                cpsr_before=cpsr,
-                cpsr_after=new_cpsr,
-                lr=at_pc + 4,
-                explanation="SWI/SVC transfiere el control al vector 0x08 en modo supervisor.",
-            )
-            return
-
-        # Placeholder para futuras excepciones
         self.last_exception = ExceptionEvent(
             type=etype,
             pc=at_pc,
-            vector=None,
+            vector=vector,
+            handler=target,
+            imm24=imm,
             cpsr_before=cpsr,
-            cpsr_after=cpsr,
-            explanation="Excepcion detectada por el backend; el tratamiento completo queda pendiente.",
+            cpsr_after=new_cpsr,
+            lr=lr,
+            fault_address=fault_address,
+            fault_access=self._format_fault_access(fault_access),
+            explanation=spec["explanation"],
         )
+        return
+
+    def _format_fault_access(self, access: int | None) -> str | None:
+        if access is None:
+            return None
+        if access in (UC_MEM_FETCH_UNMAPPED, UC_MEM_FETCH_PROT):
+            return "fetch"
+        if access in (UC_MEM_READ_UNMAPPED, UC_MEM_READ_PROT):
+            return "read"
+        if access in (UC_MEM_WRITE_UNMAPPED, UC_MEM_WRITE_PROT):
+            return "write"
+        return str(access)

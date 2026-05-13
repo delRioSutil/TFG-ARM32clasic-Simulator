@@ -14,7 +14,7 @@ El proyecto es un simulador/emulador docente de ARM32 orientado a practicas de l
 - depuracion tipo debugger: step into, step over y step out;
 - breakpoints;
 - desensamblado;
-- excepciones relevantes del temario;
+- excepciones relevantes del temario: Reset, Undefined Instruction, SWI/SVC, Prefetch Abort, Data Abort, IRQ y FIQ;
 - ejercicios guiados y validacion de resultados.
 
 La prioridad de diseño es pedagogica: el sistema debe ayudar a entender que ocurre, no solo ejecutar codigo.
@@ -298,11 +298,17 @@ En la implementacion actual, si el ELF contiene un simbolo `swi_handler` o `svc_
 
 Prioridad provisional:
 
-1. SWI/SVC.
-2. Undefined instruction.
-3. Data abort por acceso invalido de memoria.
-4. Prefetch abort por ejecucion fuera de memoria valida.
-5. IRQ/FIQ simuladas si el temario lo justifica.
+Estado actual:
+
+- Reset: simulable desde la CLI; entra por el vector `0x00` en modo SVC.
+- Undefined Instruction: detectada cuando Unicorn informa de una instruccion invalida; entra por `0x04` en modo UND.
+- SWI/SVC: detectada por hook de instruccion; entra por `0x08` en modo SVC.
+- Prefetch Abort: detectada cuando se intenta ejecutar codigo fuera de memoria valida; entra por `0x0C` en modo ABT.
+- Data Abort: detectada cuando una lectura/escritura de datos accede a memoria invalida; entra por `0x10` en modo ABT.
+- IRQ: interrupcion simulable desde la CLI; entra por `0x18` en modo IRQ.
+- FIQ: interrupcion simulable desde la CLI; entra por `0x1C` en modo FIQ.
+
+Cada evento registra vector arquitectonico, handler resuelto por simbolo cuando existe, CPSR anterior/posterior, LR calculado y, para abortos, direccion de fallo y tipo de acceso.
 
 ## 7. Ejercicios y correccion
 
