@@ -182,7 +182,7 @@ class UnicornBackend:
         self._configure_epd6_stacks()
         self._enter_user_mode()
         mu.reg_write(UC_ARM_REG_PC, entry_point if entry_point is not None else base)
-        # Hook para ver cada instrucciÃ³n y detectar SWI
+        # Hook para ver cada instruccion y detectar SWI.
         self.mu.hook_add(UC_HOOK_CODE, self._hook_code)
         self.mu.hook_add(UC_HOOK_MEM_INVALID, self._hook_mem_invalid)
         self.base = base
@@ -228,7 +228,7 @@ class UnicornBackend:
             else:
                 raise
 
-        # Si hubo excepciÃ³n detectada por hook o por error, entra en excepciÃ³n
+        # Si hubo excepcion detectada por hook o por error, entra en excepcion.
         if self._pending_exception:
             etype, at_pc, extra = self._pending_exception
             self._enter_exception(
@@ -312,13 +312,13 @@ class UnicornBackend:
     def read_memory(self, address: int, size: int) -> bytes:
         self._ensure_loaded()
         if size <= 0:
-            raise ValueError("El tamaÃ±o de memoria debe ser mayor que cero.")
+            raise ValueError("El tamano de memoria debe ser mayor que cero.")
 
         try:
             return bytes(self.mu.mem_read(address, size))
         except UcError as exc:
             raise RuntimeError(
-                f"No se pudo leer memoria en 0x{address:08X} con tamaÃ±o {size}."
+                f"No se pudo leer memoria en 0x{address:08X} con tamano {size}."
             ) from exc
     
     def add_breakpoint(self, addr_hex: str):
@@ -330,7 +330,7 @@ class UnicornBackend:
 
     def run_until_break(self, max_steps: int = 100000, stop_on_exception: bool = True):
         """
-        Ejecuta instrucciÃ³n a instrucciÃ³n hasta:
+        Ejecuta instruccion a instruccion hasta:
         - llegar a un breakpoint (PC == addr)
         - o consumir max_steps
         Devuelve: "break" o "max"
@@ -433,7 +433,7 @@ class UnicornBackend:
         return False
 
     def _hook_code(self, uc, address, size, user_data=None):
-        # Por ahora solo ARM (4 bytes). Thumb lo trataremos mÃ¡s adelante.
+        # Por ahora solo ARM (4 bytes). Thumb lo trataremos mas adelante.
         if size != 4:
             return
 
