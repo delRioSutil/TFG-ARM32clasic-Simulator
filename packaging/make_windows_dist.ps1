@@ -1,12 +1,13 @@
 param(
-    [string]$Name = "ARM32TeachingSimulator-Windows"
+    [string]$Name = "ARM32TeachingSimulator-Windows",
+    [string]$PythonExe = "python"
 )
 
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$SpecPath = Join-Path $ProjectRoot "packaging\pyinstaller\sim.spec"
-$PyInstallerDist = Join-Path $ProjectRoot "dist\sim"
+$FreezeSetup = Join-Path $ProjectRoot "packaging\cxfreeze_setup.py"
+$FreezeDist = Join-Path $ProjectRoot "packaging\build\sim"
 $FinalRoot = Join-Path $ProjectRoot "packaging\dist\$Name"
 $FinalZip = Join-Path $ProjectRoot "packaging\dist\$Name.zip"
 $ToolchainBin = Join-Path $ProjectRoot "runtime\toolchain\bin"
@@ -31,14 +32,20 @@ foreach ($Tool in $RequiredTools) {
 
 Push-Location $ProjectRoot
 try {
-    python -m PyInstaller --clean --noconfirm $SpecPath
+    if (Test-Path $FreezeDist) {
+        Remove-Item $FreezeDist -Recurse -Force
+    }
+    & $PythonExe $FreezeSetup build_exe --build-exe $FreezeDist
+    if ($LASTEXITCODE -ne 0) {
+        throw "cx_Freeze fallo con codigo $LASTEXITCODE."
+    }
 
     if (Test-Path $FinalRoot) {
         Remove-Item $FinalRoot -Recurse -Force
     }
     New-Item -ItemType Directory -Path $FinalRoot | Out-Null
 
-    Copy-Item -Path (Join-Path $PyInstallerDist "*") -Destination $FinalRoot -Recurse
+    Copy-Item -Path (Join-Path $FreezeDist "*") -Destination $FinalRoot -Recurse
 
     New-Item -ItemType Directory -Path (Join-Path $FinalRoot "runtime\toolchain") -Force | Out-Null
     Copy-Item -Path $ToolchainBin -Destination (Join-Path $FinalRoot "runtime\toolchain") -Recurse

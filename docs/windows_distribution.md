@@ -88,7 +88,7 @@ El entorno de desarrollo puede prepararse con:
 python -m pip install -r requirements.txt
 ```
 
-La estrategia elegida para la distribucion final sera PyInstaller, pero se implementara mas adelante, cuando el nucleo del simulador este mas estable. El objetivo final sera entregar un ejecutable Windows junto con la toolchain local:
+La estrategia elegida para la distribucion final es `cx_Freeze`, despues de comprobar que empaqueta de forma estable Python, Unicorn y sus DLL nativas en Windows. El objetivo final es entregar un ejecutable Windows junto con la toolchain local:
 
 ```text
 TFG-ARM32-Simulator/
@@ -106,7 +106,13 @@ TFG-ARM32-Simulator/
   README.md
 ```
 
-PyInstaller no se introduce todavia como dependencia del proyecto porque no forma parte del runtime normal del simulador. Se anadira en una fase posterior de empaquetado, probablemente bajo una carpeta `packaging/`.
+El empaquetado se genera desde `packaging/make_windows_dist.ps1`, preferiblemente usando un entorno Windows con Python 3.12:
+
+```powershell
+py -3.12 -m venv .venv-win
+.\.venv-win\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\packaging\make_windows_dist.ps1 -PythonExe .\.venv-win\Scripts\python.exe
+```
 
 ## Comprobacion del entorno
 

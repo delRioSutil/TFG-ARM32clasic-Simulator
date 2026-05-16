@@ -458,7 +458,7 @@ python -m pytest
 
 ## 12. Empaquetado Windows
 
-La distribucion final se plantea como un entregable Windows autocontenido generado con PyInstaller en modo one-folder. El repositorio de desarrollo no incluye artefactos generados ni binarios pesados de la toolchain; estos se mantienen fuera de Git y se copian al entregable en el momento de empaquetar.
+La distribucion final se plantea como un entregable Windows autocontenido generado con `cx_Freeze`. El repositorio de desarrollo no incluye artefactos generados ni binarios pesados de la toolchain; estos se mantienen fuera de Git y se copian al entregable en el momento de empaquetar.
 
 Estructura prevista del entregable:
 

@@ -72,8 +72,9 @@ python -m pytest
 El entregable autocontenido se genera fuera del arbol de desarrollo principal:
 
 ```powershell
-python -m pip install -r requirements-dev.txt
-.\packaging\make_windows_dist.ps1
+py -3.12 -m venv .venv-win
+.\.venv-win\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\packaging\make_windows_dist.ps1 -PythonExe .\.venv-win\Scripts\python.exe
 ```
 
 Antes de empaquetar, coloca la toolchain GNU ARM en:
@@ -84,4 +85,4 @@ runtime/toolchain/bin/
 
 La salida se crea en `packaging/dist/` y no se versiona en Git.
 
-La distribucion final prevista sera autocontenida para Windows, con PyInstaller y toolchain local en `runtime/toolchain/bin`.
+La distribucion final es autocontenida para Windows, se genera con `cx_Freeze` y usa la toolchain local en `runtime/toolchain/bin`.

@@ -9,7 +9,10 @@ packaging/build/
 *.zip
 __pycache__/
 .venv/
+.venv-win/
 .idea/
+ARM32TeachingSimulator.egg-info/
+src/ARM32TeachingSimulator.egg-info/
 .sim_state.json
 runtime/toolchain/bin/*
 !runtime/toolchain/bin/.gitkeep
