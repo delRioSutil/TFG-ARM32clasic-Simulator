@@ -1,8 +1,12 @@
 build/
+dist/
+packaging/dist/
+packaging/build/
 *.o
 *.elf
 *.bin
 *.map
+*.zip
 __pycache__/
 .venv/
 .idea/

@@ -455,3 +455,24 @@ El objetivo no es cubrir todo de forma exhaustiva, sino proteger las funcionalid
 ```powershell
 python -m pytest
 ```
+
+## 12. Empaquetado Windows
+
+La distribucion final se plantea como un entregable Windows autocontenido generado con PyInstaller en modo one-folder. El repositorio de desarrollo no incluye artefactos generados ni binarios pesados de la toolchain; estos se mantienen fuera de Git y se copian al entregable en el momento de empaquetar.
+
+Estructura prevista del entregable:
+
+```text
+ARM32TeachingSimulator-Windows/
+  sim.exe
+  runtime/
+    toolchain/
+      bin/
+        arm-none-eabi-*.exe
+  examples/
+  README_ENTREGA.txt
+```
+
+El script `packaging/make_windows_dist.ps1` genera la carpeta final y un `.zip` dentro de `packaging/dist/`. Para mantener limpio el proyecto, `dist/`, `packaging/dist/` y `packaging/build/` quedan ignorados por Git.
+
+En desarrollo, el proyecto resuelve rutas desde la raiz del repositorio. En el ejecutable empaquetado, `sim.toolchain.gnu` detecta `sys.frozen` y toma como raiz la carpeta donde esta `sim.exe`, permitiendo encontrar `runtime/toolchain/bin` dentro del entregable.

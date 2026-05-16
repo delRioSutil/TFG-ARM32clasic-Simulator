@@ -1,10 +1,17 @@
 import subprocess
 import os
 import shutil
+import sys
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+def _project_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[2]
+
+
+PROJECT_ROOT = _project_root()
 BUILD_DIR = PROJECT_ROOT / "build"
 TOOLCHAIN_ENV = "ARM32SIM_TOOLCHAIN_BIN"
 REQUIRED_TOOLCHAIN_TOOLS = [

@@ -67,4 +67,21 @@ python -m pip install -r requirements.txt
 python -m pytest
 ```
 
+## Entregable Windows
+
+El entregable autocontenido se genera fuera del arbol de desarrollo principal:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+.\packaging\make_windows_dist.ps1
+```
+
+Antes de empaquetar, coloca la toolchain GNU ARM en:
+
+```text
+runtime/toolchain/bin/
+```
+
+La salida se crea en `packaging/dist/` y no se versiona en Git.
+
 La distribucion final prevista sera autocontenida para Windows, con PyInstaller y toolchain local en `runtime/toolchain/bin`.
